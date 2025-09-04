@@ -1,12 +1,14 @@
 // Prisma schema for Sprint 3. Builds on top of the existing FeatherLite storefront.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // This helps Vercel’s Debian image; keep native too for local dev.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = env("DATABASE_PROVIDER")
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Collection {
