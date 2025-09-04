@@ -1,0 +1,86 @@
+// Prisma schema for Sprint 3. Builds on top of the existing FeatherLite storefront.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+model Collection {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  season    String?
+  startDate DateTime?
+  endDate   DateTime?
+  products  Product[]
+}
+
+model Product {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  name         String
+  kind         String
+  description  String?
+  ingredients  String?
+  live         Boolean     @default(true)
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  collectionId String?
+  variants     Variant[]
+  images       Image[]
+  reviews      Review[]
+}
+
+model Variant {
+  id            String   @id @default(cuid())
+  product       Product  @relation(fields: [productId], references: [id])
+  productId     String
+  name          String
+  sku           String   @unique
+  priceCents    Int
+  stockQty      Int      @default(0)
+  stripePriceId String?
+  /// Hex value representing this shade; optional until all variants are updated.
+  hex           String?
+}
+
+model Image {
+  id        String  @id @default(cuid())
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  alt       String?
+  url       String
+}
+
+model Order {
+  id            String     @id @default(cuid())
+  email         String?
+  currency      String     @default("usd")
+  amountTotal   Int
+  stripeSession String     @unique
+  createdAt     DateTime   @default(now())
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  order      Order   @relation(fields: [orderId], references: [id])
+  orderId    String
+  sku        String
+  qty        Int
+  priceCents Int
+}
+
+/// Customer reviews for products. Used on the product detail page to build trust.
+model Review {
+  id        String    @id @default(cuid())
+  product   Product   @relation(fields: [productId], references: [id])
+  productId String
+  name      String?
+  rating    Int
+  comment   String
+  createdAt DateTime  @default(now())
+}
