@@ -19,6 +19,22 @@ const REQUIRED_ENV_VARS: EnvKey[] = [
   'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
   'SHOPIFY_ADMIN_ACCESS_TOKEN',
   'SHOPIFY_WEBHOOK_SECRET',
+] as const;
+
+if (process.env.SKIP_ENV_VALIDATION !== 'true') {
+  const missing = REQUIRED_ENV_VARS.filter((name) => {
+    const value = process.env[name];
+    return value === undefined || value === '';
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`,
+    );
+  }
+}
+
+export {};
 ];
 
 function isMissing(value: string | undefined | null): value is undefined | null | '' {
