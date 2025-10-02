@@ -1,19 +1,20 @@
 // This route must run on Node.js rather than the Edge runtime because it uses
-// Prisma and Stripe, which are not supported in Edge. Mark it as dynamic
+// Prisma and the Shopify SDK, which are not supported in Edge. Mark it as dynamic
 // and disable ISR caching to prevent build-time invocation.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import prisma from '@/lib/prisma';
+import { getShopifyBuyClient } from '@/lib/shopify';
 
 /**
- * Handle POST requests to initiate a Stripe Checkout session. The body
+ * Handle POST requests to initiate a Shopify checkout using the Buy SDK. The body
  * should contain an items array with objects specifying sku and qty.
- * Each SKU must match a variant in the database. When the session
- * creation succeeds the client is redirected to the Stripe hosted
+ * Each SKU must match a variant in the database and that variant must have
+ * a Shopify variant ID available (populated via the product sync job).
+ * When the checkout succeeds the client is redirected to the Shopify hosted
  * checkout page via the returned URL.
  */
 export async function POST(req: Request) {
@@ -25,34 +26,43 @@ export async function POST(req: Request) {
   const skus = items.map((i: any) => i.sku);
   const variants = await prisma.variant.findMany({
     where: { sku: { in: skus } },
-    include: { product: true },
   });
-  // Build line items for Stripe
-  const line_items = variants.map((v) => {
-    const qty = items.find((i: any) => i.sku === v.sku)?.qty ?? 1;
-    return {
-      quantity: qty,
-      price_data: {
-        currency: 'usd',
-        unit_amount: v.priceCents,
-        product_data: {
-          name: `${v.product.name} – ${v.name}`,
-        },
-      },
-    };
-  });
-  const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const variantBySku = new Map(variants.map((variant) => [variant.sku, variant]));
+  let lineItems: { variantId: string; quantity: number }[];
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items,
-      success_url: `${base}/success`,
-      cancel_url: `${base}/cancel`,
+    lineItems = items.map((item: any) => {
+      const variant = variantBySku.get(item.sku);
+      const qty = Number(item.qty) || 1;
+      if (!variant) {
+        throw new Error(`Variant with SKU ${item.sku} not found.`);
+      }
+      if (!variant.shopifyVariantId) {
+        throw new Error(`Variant ${variant.sku} is missing a Shopify variant ID.`);
+      }
+      return {
+        variantId: variant.shopifyVariantId,
+        quantity: qty,
+      };
     });
-    return NextResponse.json({ url: session.url });
+  } catch (mappingError: any) {
+    const message =
+      typeof mappingError?.message === 'string'
+        ? mappingError.message
+        : 'Unable to prepare Shopify checkout.';
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  try {
+    const client = getShopifyBuyClient();
+    const checkout = await client.checkout.create();
+    const updatedCheckout = await client.checkout.addLineItems(checkout.id, lineItems);
+    if (!updatedCheckout.webUrl) {
+      throw new Error('Shopify checkout did not return a web URL.');
+    }
+    return NextResponse.json({ url: updatedCheckout.webUrl, checkoutId: updatedCheckout.id });
   } catch (err: any) {
     console.error(err);
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+    const message = typeof err?.message === 'string' ? err.message : 'Failed to create checkout';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

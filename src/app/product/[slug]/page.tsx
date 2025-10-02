@@ -12,6 +12,7 @@ interface ProductVariant {
   sku: string;
   priceCents: number;
   hex?: string | null;
+  shopifyVariantId?: string | null;
 }
 
 interface Product {
@@ -62,6 +63,7 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
   }
 
   const selectedVariant = product.variants[variantIndex];
+  const canPurchase = Boolean(selectedVariant.shopifyVariantId);
 
   // Build array of swatches from all variants that include a hex value
   const swatches: Shade[] = product.variants
@@ -72,6 +74,10 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
   // session and redirects the browser when complete. Falls back to
   // Add to cart behaviour if the API call fails.
   async function handleBuyNow() {
+    if (!selectedVariant.shopifyVariantId) {
+      console.error('Selected variant is missing a Shopify variant ID.');
+      return;
+    }
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
@@ -87,7 +93,23 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
       console.error(err);
     }
     // If checkout fails, just add to cart as a fallback
-    add(selectedVariant.sku, `${product.name} – ${selectedVariant.name}`, 1);
+    try {
+      await add({ merchandiseId: selectedVariant.shopifyVariantId, quantity: 1 });
+    } catch (addErr) {
+      console.error(addErr);
+    }
+  }
+
+  async function handleAddToCart() {
+    if (!selectedVariant.shopifyVariantId) {
+      console.error('Selected variant is missing a Shopify variant ID.');
+      return;
+    }
+    try {
+      await add({ merchandiseId: selectedVariant.shopifyVariantId, quantity: 1 });
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   return (
@@ -151,20 +173,16 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
             }
           </div>
           <button
-            onClick={() =>
-              add(
-                selectedVariant.sku,
-                `${product.name} – ${selectedVariant.name}`,
-                1
-              )
-            }
-            className="rounded-full bg-foreground text-white px-6 py-3 hover:bg-accent transition"
+            onClick={handleAddToCart}
+            disabled={!canPurchase}
+            className="rounded-full bg-foreground text-white px-6 py-3 hover:bg-accent transition disabled:opacity-50"
           >
             Add to Cart
           </button>
           <button
             onClick={handleBuyNow}
-            className="rounded-full border px-6 py-3 hover:bg-primary/30 transition"
+            disabled={!canPurchase}
+            className="rounded-full border px-6 py-3 hover:bg-primary/30 transition disabled:opacity-50"
           >
             Buy Now
           </button>
@@ -175,6 +193,12 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
           <div className="mt-8 text-sm text-gray-600">
             Ingredients: {product.ingredients}
           </div>
+        )}
+
+        {!canPurchase && (
+          <p className="mt-4 text-sm text-red-500">
+            This variant is not available for online purchase yet.
+          </p>
         )}
 
         {/* Reviews section */}

@@ -1,104 +1,216 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import type { NormalizedCart, NormalizedCartItem } from '@/lib/shopify';
 
-// Define a cart item. We store the SKU, quantity and an optional name
-// field which is useful for displaying the item later. Additional fields
-// such as price can be added in the future if desired.
-export type CartItem = {
-  sku: string;
-  qty: number;
-  name?: string;
-};
+export type CartItem = NormalizedCartItem;
 
-// Context type. Exposes the list of items currently in the cart along
-// with helper functions to add a new item or clear the cart entirely.
 type CartCtx = {
+  cartId: string | null;
+  checkoutUrl: string | null;
+  currencyCode: string;
+  subtotalCents: number;
   items: CartItem[];
-  add: (sku: string, name?: string, qty?: number) => void;
-  remove: (sku: string) => void;
-  updateQty: (sku: string, qty: number) => void;
-  clear: () => void;
+  add: (options: { merchandiseId: string; quantity?: number }) => Promise<void>;
+  remove: (lineId: string) => Promise<void>;
+  updateQty: (lineId: string, quantity: number) => Promise<void>;
+  clear: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
-// Create the React context. We initialise with null as we'll provide
-// the value within the provider component below.
 const CartContext = createContext<CartCtx | null>(null);
 
-/**
- * CartProvider wraps the application and provides cart functionality
- * via React context. Components can use the useCart hook to access the
- * cart state. Cart state is local to the client and does not persist
- * across sessions. Consider adding persistence via localStorage in a
- * future iteration.
- */
 export function CartProvider({ children }: { children: ReactNode }) {
-  // Initialise cart state from localStorage if it exists. Use a function
-  // initializer so this only runs on the client during hydration.
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('featherlite-cart');
-        if (stored) return JSON.parse(stored) as CartItem[];
-      } catch (err) {
-        console.warn('Failed to parse cart from localStorage', err);
-      }
-    }
-    return [];
+  const [cartId, setCartId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('shopify-cart-id');
   });
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [subtotalCents, setSubtotalCents] = useState(0);
+  const [currencyCode, setCurrencyCode] = useState('USD');
 
-  // Persist cart to localStorage whenever it changes.
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('featherlite-cart', JSON.stringify(items));
-    }
-  }, [items]);
-
-  // Add an item to the cart. If the item already exists the quantity
-  // increases. Otherwise a new item is appended.
-  const add = (sku: string, name?: string, qty = 1) => {
-    setItems((prev) => {
-      const existing = prev.find((i) => i.sku === sku);
-      if (existing) {
-        return prev.map((i) =>
-          i.sku === sku ? { ...i, qty: i.qty + qty } : i
-        );
-      }
-      return [...prev, { sku, qty, name }];
-    });
-  };
-
-  // Remove an item from the cart entirely.
-  const remove = (sku: string) => {
-    setItems((prev) => prev.filter((i) => i.sku !== sku));
-  };
-
-  // Update the quantity of a cart item. If qty <= 0 remove the item.
-  const updateQty = (sku: string, qty: number) => {
-    if (qty <= 0) {
-      remove(sku);
+  const applyCart = useCallback((cart: NormalizedCart | null | undefined) => {
+    if (cart && cart.id) {
+      setCartId(cart.id);
+      setItems(Array.isArray(cart.items) ? cart.items : []);
+      setCheckoutUrl(cart.checkoutUrl ?? null);
+      setSubtotalCents(cart.subtotalCents ?? 0);
+      setCurrencyCode(cart.currencyCode ?? 'USD');
     } else {
-      setItems((prev) =>
-        prev.map((i) => (i.sku === sku ? { ...i, qty } : i))
-      );
+      setItems([]);
+      setCheckoutUrl(null);
+      setSubtotalCents(0);
+      setCurrencyCode('USD');
+      setCartId(null);
     }
-  };
+  }, []);
 
-  // Clear the cart completely.
-  const clear = () => setItems([]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (cartId) {
+      localStorage.setItem('shopify-cart-id', cartId);
+    } else {
+      localStorage.removeItem('shopify-cart-id');
+    }
+  }, [cartId]);
 
-  return (
-    <CartContext.Provider value={{ items, add, remove, updateQty, clear }}>
-      {children}
-    </CartContext.Provider>
+  const refresh = useCallback(async () => {
+    if (!cartId) return;
+    try {
+      const res = await fetch(`/api/shopify/cart?cartId=${encodeURIComponent(cartId)}`, {
+        cache: 'no-store',
+      });
+      if (res.status === 404) {
+        applyCart(null);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Failed to refresh cart', data);
+        return;
+      }
+      applyCart(data.cart);
+    } catch (err) {
+      console.error('Failed to refresh cart', err);
+    }
+  }, [cartId, applyCart]);
+
+  useEffect(() => {
+    if (cartId) {
+      refresh();
+    } else {
+      applyCart(null);
+    }
+  }, [cartId, refresh, applyCart]);
+
+  const add = useCallback(
+    async ({ merchandiseId, quantity = 1 }: { merchandiseId: string; quantity?: number }) => {
+      if (!merchandiseId) {
+        throw new Error('merchandiseId is required to add to cart.');
+      }
+      try {
+        const res = await fetch('/api/shopify/cart', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            cartId,
+            lines: [{ merchandiseId, quantity }],
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to add to cart');
+        }
+        applyCart(data.cart);
+      } catch (err) {
+        console.error('Failed to add item to cart', err);
+        throw err;
+      }
+    },
+    [cartId, applyCart]
   );
+
+  const remove = useCallback(
+    async (lineId: string) => {
+      if (!cartId) return;
+      try {
+        const res = await fetch('/api/shopify/cart', {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cartId, lineIds: [lineId] }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to remove item');
+        }
+        applyCart(data.cart);
+      } catch (err) {
+        console.error('Failed to remove cart line', err);
+        throw err;
+      }
+    },
+    [cartId, applyCart]
+  );
+
+  const updateQty = useCallback(
+    async (lineId: string, quantity: number) => {
+      if (!cartId) return;
+      if (quantity <= 0) {
+        await remove(lineId);
+        return;
+      }
+      try {
+        const res = await fetch('/api/shopify/cart', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cartId, lines: [{ id: lineId, quantity }] }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to update item');
+        }
+        applyCart(data.cart);
+      } catch (err) {
+        console.error('Failed to update cart line', err);
+        throw err;
+      }
+    },
+    [cartId, applyCart, remove]
+  );
+
+  const clear = useCallback(async () => {
+    if (!cartId || items.length === 0) {
+      applyCart(null);
+      return;
+    }
+    try {
+      const res = await fetch('/api/shopify/cart', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cartId,
+          lineIds: items.map((item) => item.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to clear cart');
+      }
+      applyCart(data.cart);
+    } catch (err) {
+      console.error('Failed to clear cart', err);
+      throw err;
+    }
+  }, [cartId, items, applyCart]);
+
+  const value = useMemo(
+    () => ({
+      cartId,
+      checkoutUrl,
+      currencyCode,
+      subtotalCents,
+      items,
+      add,
+      remove,
+      updateQty,
+      clear,
+      refresh,
+    }),
+    [cartId, checkoutUrl, currencyCode, subtotalCents, items, add, remove, updateQty, clear, refresh]
+  );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
-/**
- * Hook to access the cart context. Throws an error if used outside
- * of the CartProvider. Components that call this hook must be within
- * a CartProvider in the React tree.
- */
 export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) {
