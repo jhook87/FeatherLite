@@ -4,30 +4,49 @@ import Link from 'next/link';
 import { useCart } from './CartProvider';
 
 /**
- * Simple navigation bar displayed at the top of each page. Shows the
- * site logo, a link to the shop and a link to the cart with the
- * quantity of items currently in the cart. The quantity is derived
- * from the cart context.
+ * Polished top navigation with brand mark, quick links and a glowing cart pill.
+ * Cart quantity is sourced from the shared cart context so the badge updates in
+ * real time as visitors add products while browsing.
  */
 export default function Navbar() {
   const { items } = useCart();
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
+  const navLinks = [
+    { href: '/shop', label: 'Shop' },
+    { href: '/shop?season=Year-Round', label: 'Collections' },
+    { href: '/#ritual', label: 'Our Ritual' },
+    { href: '/#ingredients', label: 'Ingredients' },
+  ];
   return (
-    <header className="sticky top-0 z-50 backdrop-blur bg-white/70 border-b">
-      <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="font-heading text-xl tracking-wide">
-          FeatherLite
-        </Link>
-        <div className="flex items-center gap-6">
-          <Link href="/shop" className="hover:underline">
-            Shop
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-border/60">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4">
+        <div className="flex items-center gap-10">
+          <Link href="/" className="font-heading text-xl tracking-tight text-text">
+            FeatherLite
           </Link>
-          <Link href="/cart" className="relative flex items-center gap-1">
-            <span className="rounded-full border px-3 py-1 hover:bg-primary/20">
-              Cart
-            </span>
+          <div className="hidden items-center gap-6 md:flex">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted transition hover:text-text"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/shop"
+            className="hidden rounded-full border border-border/70 px-4 py-2 text-sm font-medium text-text transition hover:border-accent hover:text-accent md:inline-flex"
+          >
+            Browse
+          </Link>
+          <Link href="/cart" className="relative inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md">
+            Cart
             {count > 0 && (
-              <span className="absolute -top-1 -right-2 bg-accent text-white text-xs rounded-full px-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-semibold text-accent">
                 {count}
               </span>
             )}

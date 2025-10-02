@@ -18,12 +18,12 @@ export type Shade = {
 export default function ShadeSwatches({ shades }: { shades: Shade[] }) {
   if (!shades || shades.length === 0) return null;
   return (
-    <div className="flex gap-2 mt-2" aria-label="Available shades">
+    <div className="mt-2 flex gap-2" aria-label="Available shades">
       {shades.map((s) => (
         <span
           key={s.name}
           title={s.name}
-          className="h-4 w-4 rounded-full border"
+          className="h-4 w-4 rounded-full border border-white/70 shadow-sm ring-1 ring-border/40"
           style={{ backgroundColor: s.hex }}
         />
       ))}

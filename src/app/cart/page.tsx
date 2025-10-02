@@ -13,7 +13,7 @@ import { variantImageForSku } from '@/lib/paths';
  * from Shopify.
  */
 export default function CartPage() {
-  const { items, clear, updateQty, remove, checkoutUrl, currencyCode, subtotalCents } = useCart();
+  const { items, clear, updateQty, remove, checkoutUrl, currencyCode, subtotalCents, refresh } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,37 +68,47 @@ export default function CartPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="font-heading text-3xl mb-6">Your Cart</h1>
+    <main className="mx-auto max-w-5xl space-y-6 px-4 pb-16 pt-12">
+      <header className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted">Your ritual bag</p>
+          <h1 className="font-heading text-3xl text-text">Shopping bag</h1>
+        </div>
+        <button
+          onClick={handleClear}
+          className="rounded-full border border-border/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-text transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={loading || items.length === 0}
+        >
+          Clear bag
+        </button>
+      </header>
+
       {items.length === 0 ? (
-        <p>Your cart is empty.</p>
+        <div className="rounded-3xl border border-border/60 bg-white/70 p-10 text-center text-sm text-muted">
+          Your bag is feeling light. Explore the <a className="text-accent underline" href="/shop">collection</a> to begin your ritual.
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {items.map((item) => (
             <div
               key={item.id}
-              className="border p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+              className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-white/80 p-6 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex items-center gap-4 w-full sm:w-auto">
-                {/* Display the product or variant image */}
+              <div className="flex w-full items-center gap-4 sm:w-auto">
                 <img
                   src={variantImageForSku(item.sku)}
                   alt={item.title}
-                  className="w-16 h-16 object-cover rounded-md"
+                  className="h-20 w-20 rounded-2xl object-cover"
                 />
                 <div>
-                  <div className="font-medium">{item.title}</div>
-                  {item.sku && (
-                    <div className="text-sm text-gray-600">SKU: {item.sku}</div>
-                  )}
-                  <div className="text-sm text-gray-600">
-                    {formatCurrency(item.unitPriceCents)} each
-                  </div>
+                  <div className="font-semibold text-text">{item.title}</div>
+                  {item.sku && <div className="text-xs uppercase tracking-wide text-muted">{item.sku}</div>}
+                  <div className="text-sm text-muted">{formatCurrency(item.unitPriceCents)} each</div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
-                <label className="text-sm text-gray-600" htmlFor={`qty-${item.id}`}>
-                  Qty:
+              <div className="flex w-full items-center justify-between gap-4 sm:w-auto">
+                <label className="text-xs uppercase tracking-wide text-muted" htmlFor={`qty-${item.id}`}>
+                  Qty
                 </label>
                 <input
                   id={`qty-${item.id}`}
@@ -106,40 +116,42 @@ export default function CartPage() {
                   min={1}
                   value={item.quantity}
                   onChange={(e) => handleQuantityChange(item.id, Number(e.target.value))}
-                  className="w-16 border rounded px-2 py-1"
+                  className="w-20 rounded-full border border-border/60 bg-white/80 px-3 py-2 text-sm text-text shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
                 <button
                   onClick={() => handleRemove(item.id)}
-                  className="text-red-600 hover:underline text-sm"
+                  className="text-xs font-semibold uppercase tracking-wide text-accent transition hover:opacity-80"
                 >
                   Remove
                 </button>
               </div>
-              <div className="text-right font-medium min-w-[6rem]">
+              <div className="min-w-[6rem] text-right font-semibold text-text">
                 {formatCurrency(item.lineTotalCents)}
               </div>
             </div>
           ))}
-          <div className="flex gap-4 mt-6">
-            <button
-              onClick={handleCheckout}
-              disabled={loading}
-              className="rounded-full bg-foreground text-white px-6 py-3 hover:bg-accent transition disabled:opacity-50"
-            >
-              {loading ? 'Processing…' : 'Checkout'}
-            </button>
-            <button
-              onClick={handleClear}
-              className="rounded-full border px-6 py-3 hover:bg-primary/30 transition disabled:opacity-50"
-              disabled={loading}
-            >
-              Clear Cart
-            </button>
+
+          <div className="flex flex-col items-end gap-4 rounded-3xl border border-border/60 bg-white/80 p-6 shadow-sm backdrop-blur">
+            <div className="text-sm text-muted">Subtotal</div>
+            <div className="text-2xl font-heading text-text">{formatCurrency(subtotalCents)}</div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleCheckout}
+                disabled={loading}
+                className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? 'Processing…' : 'Proceed to checkout'}
+              </button>
+              <button
+                onClick={refresh}
+                className="rounded-full border border-border/70 px-6 py-3 text-sm font-semibold text-text transition hover:border-accent hover:text-accent"
+              >
+                Refresh totals
+              </button>
+            </div>
           </div>
-          <div className="text-right text-lg font-semibold">
-            Subtotal: {formatCurrency(subtotalCents)}
-          </div>
-          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
       )}
     </main>

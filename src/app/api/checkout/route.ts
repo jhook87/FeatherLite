@@ -7,7 +7,8 @@ export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getShopifyBuyClient } from '@/lib/shopify';
+import { getDummyVariantBySku } from '@/lib/dummyContent';
+import { getShopifyBuyClient, isShopifyStorefrontConfigured } from '@/lib/shopify';
 
 /**
  * Handle POST requests to initiate a Shopify checkout using the Buy SDK. The body
@@ -24,14 +25,19 @@ export async function POST(req: Request) {
   }
   // Load variants from DB based on provided SKUs
   const skus = items.map((i: any) => i.sku);
-  const variants = await prisma.variant.findMany({
-    where: { sku: { in: skus } },
-  });
-  const variantBySku = new Map(variants.map((variant) => [variant.sku, variant]));
+  let variantBySku = new Map<string, any>();
+  try {
+    const variants = await prisma.variant.findMany({
+      where: { sku: { in: skus } },
+    });
+    variantBySku = new Map(variants.map((variant) => [variant.sku, variant]));
+  } catch (error) {
+    console.warn('Failed to load variants from database for checkout, will use dummy data.', error);
+  }
   let lineItems: { variantId: string; quantity: number }[];
   try {
     lineItems = items.map((item: any) => {
-      const variant = variantBySku.get(item.sku);
+      const variant = variantBySku.get(item.sku) ?? getDummyVariantBySku(item.sku)?.variant;
       const qty = Number(item.qty) || 1;
       if (!variant) {
         throw new Error(`Variant with SKU ${item.sku} not found.`);
@@ -50,6 +56,16 @@ export async function POST(req: Request) {
         ? mappingError.message
         : 'Unable to prepare Shopify checkout.';
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  if (!isShopifyStorefrontConfigured()) {
+    const mockCheckoutId = `mock-checkout-${Date.now()}`;
+    const mockUrl = `https://checkout.featherlite.test/${mockCheckoutId}`;
+    return NextResponse.json({
+      url: mockUrl,
+      checkoutId: mockCheckoutId,
+      mock: true,
+    });
   }
 
   try {
