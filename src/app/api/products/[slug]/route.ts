@@ -8,6 +8,7 @@ export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getDummyProduct } from '@/lib/dummyContent';
 
 /**
  * API endpoint that returns a single product by slug. Includes variants,
@@ -18,16 +19,25 @@ export async function GET(
   _req: Request,
   { params }: { params: { slug: string } }
 ) {
-  const product = await prisma.product.findUnique({
-    where: { slug: params.slug },
-    include: {
-      variants: true,
-      images: true,
-      collection: true,
-    },
-  });
-  if (!product) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug: params.slug },
+      include: {
+        variants: true,
+        images: true,
+        collection: true,
+      },
+    });
+    if (product) {
+      return NextResponse.json(product);
+    }
+  } catch (error) {
+    console.warn(`Falling back to dummy product for slug ${params.slug}`, error);
+  }
+
+  const fallback = getDummyProduct(params.slug);
+  if (!fallback) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(product);
+  return NextResponse.json(fallback);
 }

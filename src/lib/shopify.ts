@@ -1,5 +1,11 @@
+import { randomUUID } from 'crypto';
 import Client from 'shopify-buy';
 import { createAdminRestApiClient } from '@shopify/admin-api-client';
+import {
+  getDummyProducts,
+  getDummyVariantByShopifyId,
+  getDummyVariantCatalog,
+} from '@/lib/dummyContent';
 
 export const shopifyConfig = {
   storeDomain: process.env.SHOPIFY_STORE_DOMAIN ?? '',
@@ -10,17 +16,34 @@ export const shopifyConfig = {
   webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET ?? '',
 };
 
+const storefrontConfigured = Boolean(
+  shopifyConfig.storeDomain && shopifyConfig.storefrontAccessToken
+);
+const adminConfigured = Boolean(shopifyConfig.storeDomain && shopifyConfig.adminAccessToken);
+
+export function isShopifyStorefrontConfigured() {
+  return storefrontConfigured;
+}
+
+export function isShopifyAdminConfigured() {
+  return adminConfigured;
+}
+
+export function isShopifyConfigured() {
+  return storefrontConfigured && adminConfigured;
+}
+
 type ShopifyBuyClient = ReturnType<typeof Client.buildClient>;
 let buyClient: ShopifyBuyClient | null = null;
 
 function ensureStorefrontConfigured() {
-  if (!shopifyConfig.storeDomain || !shopifyConfig.storefrontAccessToken) {
+  if (!isShopifyStorefrontConfigured()) {
     throw new Error('Shopify storefront credentials are not configured.');
   }
 }
 
 function ensureAdminConfigured() {
-  if (!shopifyConfig.storeDomain || !shopifyConfig.adminAccessToken) {
+  if (!isShopifyAdminConfigured()) {
     throw new Error('Shopify admin credentials are not configured.');
   }
 }
@@ -193,6 +216,145 @@ function normalizeCart(cart: CartFragment | null | undefined): NormalizedCart | 
   };
 }
 
+const MOCK_CHECKOUT_BASE_URL = 'https://checkout.featherlite.test';
+
+type MockCartLine = {
+  id: string;
+  merchandiseId: string;
+  title: string;
+  sku: string | null;
+  quantity: number;
+  unitPriceCents: number;
+  currencyCode: string;
+};
+
+type MockCart = {
+  id: string;
+  lines: MockCartLine[];
+  checkoutUrl: string;
+  currencyCode: string;
+};
+
+const mockCarts = new Map<string, MockCart>();
+
+function getVariantInfo(merchandiseId: string) {
+  const match = getDummyVariantByShopifyId(merchandiseId);
+  if (match) {
+    const titleSuffix = match.variant.name && match.variant.name !== 'Default' ? ` – ${match.variant.name}` : '';
+    return {
+      title: `${match.product.name}${titleSuffix}`,
+      sku: match.variant.sku,
+      priceCents: match.variant.priceCents,
+      currencyCode: 'USD',
+    };
+  }
+  return {
+    title: 'FeatherLite Sample Item',
+    sku: null,
+    priceCents: 2800,
+    currencyCode: 'USD',
+  };
+}
+
+function ensureMockCart(cartId: string): MockCart {
+  const cart = mockCarts.get(cartId);
+  if (!cart) {
+    throw new Error('Cart not found');
+  }
+  return cart;
+}
+
+function toNormalizedMockCart(cart: MockCart): NormalizedCart {
+  const items: NormalizedCartItem[] = cart.lines.map((line) => ({
+    id: line.id,
+    merchandiseId: line.merchandiseId,
+    title: line.title,
+    quantity: line.quantity,
+    sku: line.sku,
+    lineTotalCents: line.unitPriceCents * line.quantity,
+    unitPriceCents: line.unitPriceCents,
+    currencyCode: line.currencyCode,
+  }));
+  const subtotalCents = items.reduce((total, item) => total + item.lineTotalCents, 0);
+  const currencyCode = items[0]?.currencyCode ?? cart.currencyCode;
+  return {
+    id: cart.id,
+    checkoutUrl: cart.checkoutUrl,
+    items,
+    subtotalCents,
+    currencyCode,
+  };
+}
+
+function addMockLine(cart: MockCart, merchandiseId: string, quantity: number) {
+  if (quantity <= 0) return;
+  const info = getVariantInfo(merchandiseId);
+  const existing = cart.lines.find((line) => line.merchandiseId === merchandiseId);
+  if (existing) {
+    existing.quantity += quantity;
+    existing.unitPriceCents = info.priceCents;
+    existing.currencyCode = info.currencyCode;
+  } else {
+    cart.lines.push({
+      id: randomUUID(),
+      merchandiseId,
+      title: info.title,
+      sku: info.sku,
+      quantity,
+      unitPriceCents: info.priceCents,
+      currencyCode: info.currencyCode,
+    });
+  }
+}
+
+function mockCreateCart(lines: CartLineInput[]): NormalizedCart {
+  const id = randomUUID();
+  const cart: MockCart = {
+    id,
+    lines: [],
+    checkoutUrl: `${MOCK_CHECKOUT_BASE_URL}/${id}`,
+    currencyCode: 'USD',
+  };
+  mockCarts.set(id, cart);
+  for (const line of lines) {
+    addMockLine(cart, line.merchandiseId, line.quantity);
+  }
+  return toNormalizedMockCart(cart);
+}
+
+function mockAddLines(cartId: string, lines: CartLineInput[]): NormalizedCart {
+  const cart = ensureMockCart(cartId);
+  for (const line of lines) {
+    addMockLine(cart, line.merchandiseId, line.quantity);
+  }
+  return toNormalizedMockCart(cart);
+}
+
+function mockUpdateLines(cartId: string, lines: CartLineUpdateInput[]): NormalizedCart {
+  const cart = ensureMockCart(cartId);
+  for (const line of lines) {
+    const existing = cart.lines.find((item) => item.id === line.id);
+    if (!existing) continue;
+    if (line.quantity <= 0) {
+      cart.lines = cart.lines.filter((item) => item.id !== line.id);
+      continue;
+    }
+    existing.quantity = line.quantity;
+  }
+  return toNormalizedMockCart(cart);
+}
+
+function mockRemoveLines(cartId: string, lineIds: string[]): NormalizedCart {
+  const cart = ensureMockCart(cartId);
+  cart.lines = cart.lines.filter((line) => !lineIds.includes(line.id));
+  return toNormalizedMockCart(cart);
+}
+
+function mockFetchCart(cartId: string): NormalizedCart | null {
+  const cart = mockCarts.get(cartId);
+  return cart ? toNormalizedMockCart(cart) : null;
+}
+
 const CART_FIELDS = `
   id
   checkoutUrl
@@ -229,6 +391,9 @@ const CART_FIELDS = `
 `;
 
 export async function createCart(lines: CartLineInput[]): Promise<NormalizedCart> {
+  if (!isShopifyStorefrontConfigured()) {
+    return mockCreateCart(lines);
+  }
   const data = await storefrontFetch<{
     cartCreate: {
       cart: CartFragment | null;
@@ -261,6 +426,9 @@ export async function createCart(lines: CartLineInput[]): Promise<NormalizedCart
 }
 
 export async function addLinesToCart(cartId: string, lines: CartLineInput[]): Promise<NormalizedCart> {
+  if (!isShopifyStorefrontConfigured()) {
+    return mockAddLines(cartId, lines);
+  }
   const data = await storefrontFetch<{
     cartLinesAdd: {
       cart: CartFragment | null;
@@ -293,6 +461,9 @@ export async function addLinesToCart(cartId: string, lines: CartLineInput[]): Pr
 }
 
 export async function updateCartLines(cartId: string, lines: CartLineUpdateInput[]): Promise<NormalizedCart> {
+  if (!isShopifyStorefrontConfigured()) {
+    return mockUpdateLines(cartId, lines);
+  }
   const data = await storefrontFetch<{
     cartLinesUpdate: {
       cart: CartFragment | null;
@@ -325,6 +496,9 @@ export async function updateCartLines(cartId: string, lines: CartLineUpdateInput
 }
 
 export async function removeCartLines(cartId: string, lineIds: string[]): Promise<NormalizedCart> {
+  if (!isShopifyStorefrontConfigured()) {
+    return mockRemoveLines(cartId, lineIds);
+  }
   const data = await storefrontFetch<{
     cartLinesRemove: {
       cart: CartFragment | null;
@@ -357,6 +531,9 @@ export async function removeCartLines(cartId: string, lineIds: string[]): Promis
 }
 
 export async function fetchCart(cartId: string): Promise<NormalizedCart | null> {
+  if (!isShopifyStorefrontConfigured()) {
+    return mockFetchCart(cartId);
+  }
   const data = await storefrontFetch<{
     cart: CartFragment | null;
   }>(
@@ -371,6 +548,22 @@ export async function fetchCart(cartId: string): Promise<NormalizedCart | null> 
 }
 
 export async function fetchShopifyProducts() {
+  if (!isShopifyAdminConfigured()) {
+    return getDummyProducts().map((product) => ({
+      id: product.id,
+      title: product.name,
+      body_html: `<p>${product.description}</p>`,
+      product_type: product.kind,
+      status: 'active',
+      variants: product.variants.map((variant) => ({
+        id: variant.shopifyVariantId,
+        title: variant.name,
+        price: (variant.priceCents / 100).toFixed(2),
+        sku: variant.sku,
+        inventory_quantity: 50,
+      })),
+    }));
+  }
   const client = getShopifyAdminClient();
   const response = await client.get('products', {
     searchParams: {
@@ -382,6 +575,33 @@ export async function fetchShopifyProducts() {
 }
 
 export async function fetchShopifyOrders() {
+  if (!isShopifyAdminConfigured()) {
+    const catalog = getDummyVariantCatalog();
+    const subtotal = catalog
+      .slice(0, 2)
+      .reduce((total, item) => total + item.priceCents, 0);
+    return [
+      {
+        id: 'mock-order-1',
+        name: '#FL1001',
+        email: 'hello@featherlite.test',
+        currency: 'USD',
+        subtotal_price: (subtotal / 100).toFixed(2),
+        total_price: (subtotal / 100 + 4.5).toFixed(2),
+        financial_status: 'paid',
+        fulfillment_status: 'fulfilled',
+        processed_at: new Date().toISOString(),
+        line_items: catalog.slice(0, 2).map((item, index) => ({
+          id: `mock-order-line-${index + 1}`,
+          name: item.title,
+          sku: item.sku,
+          quantity: 1,
+          price: (item.priceCents / 100).toFixed(2),
+          variant_id: item.merchandiseId,
+        })),
+      },
+    ];
+  }
   const client = getShopifyAdminClient();
   const response = await client.get('orders', {
     searchParams: {

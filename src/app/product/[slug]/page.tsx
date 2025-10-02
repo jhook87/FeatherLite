@@ -22,6 +22,7 @@ interface Product {
   kind: string;
   ingredients?: string | null;
   variants: ProductVariant[];
+  highlights?: string[];
 }
 
 /**
@@ -59,7 +60,13 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
   }, [slug]);
 
   if (!product) {
-    return <main className="p-8">Loading…</main>;
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-16">
+        <div className="rounded-3xl border border-border/60 bg-white/70 p-10 text-center text-sm text-muted">
+          Loading the details of this ritual favourite…
+        </div>
+      </main>
+    );
   }
 
   const selectedVariant = product.variants[variantIndex];
@@ -69,6 +76,12 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
   const swatches: Shade[] = product.variants
     .filter((v) => !!v.hex)
     .map((v) => ({ name: v.name, hex: v.hex! }));
+  const highlights = Array.isArray((product as any).highlights)
+    ? ((product as any).highlights as string[])
+    : [];
+  const ingredients = product.ingredients
+    ? product.ingredients.split(',').map((item) => item.trim()).filter(Boolean)
+    : [];
 
   // Handler for clicking the Buy Now button. Creates a Stripe checkout
   // session and redirects the browser when complete. Falls back to
@@ -113,47 +126,54 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10 grid md:grid-cols-2 gap-10">
-      <div>
-        {/* Primary product image. Use variant-specific image when available, otherwise fall back to the product image. */}
-        <img
-          src={variantImageForSku(selectedVariant.sku) || imageForSlug(product.slug)}
-          alt={product.name || 'Product image'}
-          className="aspect-square w-full rounded-2xl object-cover"
-        />
-        {/* Thumbnail gallery showing images for each variant. If a variant does not have its own image,
-             fall back to the product image. */}
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {product.variants.map((v) => (
-            <img
+    <main className="mx-auto max-w-6xl grid gap-12 px-4 pb-20 pt-12 md:grid-cols-[1.1fr_1fr]">
+      <div className="space-y-4">
+        <div className="rounded-[3rem] border border-border/60 bg-white/80 p-6 shadow-lg">
+          <img
+            src={variantImageForSku(selectedVariant.sku) || imageForSlug(product.slug)}
+            alt={product.name || 'Product image'}
+            className="aspect-square w-full rounded-[2rem] object-cover"
+          />
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {product.variants.map((v, idx) => (
+            <button
               key={v.sku}
-              src={variantImageForSku(v.sku) || imageForSlug(product.slug)}
-              alt={`${product.name} – ${v.name}`}
-              className="aspect-square w-full rounded-xl object-cover cursor-pointer hover:opacity-80"
-              onClick={() => setVariantIndex(product.variants.indexOf(v))}
-            />
+              type="button"
+              onClick={() => setVariantIndex(idx)}
+              className={`overflow-hidden rounded-2xl border ${
+                idx === variantIndex ? 'border-accent ring-2 ring-accent/40' : 'border-border/60'
+              }`}
+            >
+              <img
+                src={variantImageForSku(v.sku) || imageForSlug(product.slug)}
+                alt={`${product.name} – ${v.name}`}
+                className="aspect-square w-full object-cover"
+              />
+            </button>
           ))}
         </div>
       </div>
-      <div className="md:sticky md:top-24">
-        <h1 className="font-heading text-3xl">{product.name}</h1>
-        {product.description && (
-          <p className="mt-2 text-gray-700">{product.description}</p>
-        )}
+      <div className="space-y-6 rounded-[3rem] border border-border/60 bg-white/80 p-8 shadow-lg backdrop-blur">
+        <div className="flex flex-col gap-3">
+          <p className="text-xs uppercase tracking-wide text-muted">{product.kind}</p>
+          <h1 className="font-heading text-3xl text-text">{product.name}</h1>
+          {product.description && (
+            <p className="text-sm leading-relaxed text-muted">{product.description}</p>
+          )}
+        </div>
 
-        {/* Display swatches if any are defined. */}
         {swatches.length > 0 && (
-          <div className="mt-6">
-            <div className="text-sm text-gray-600 mb-2">Shades</div>
+          <div>
+            <span className="text-xs uppercase tracking-wide text-muted">Shades</span>
             <ShadeSwatches shades={swatches} />
           </div>
         )}
 
-        {/* Variant selector */}
-        <div className="mt-6">
-          <label className="block text-sm text-gray-600 mb-1">Select variant</label>
+        <div className="space-y-2">
+          <label className="text-xs uppercase tracking-wide text-muted">Select shade</label>
           <select
-            className="border rounded-lg px-3 py-2"
+            className="w-full rounded-full border border-border/60 bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
             value={variantIndex}
             onChange={(e) => setVariantIndex(parseInt(e.target.value, 10))}
           >
@@ -165,45 +185,59 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
           </select>
         </div>
 
-        {/* Price and actions */}
-        <div className="mt-6 flex flex-wrap items-center gap-4">
-          <div className="text-xl font-heading">
-            ${
-              (selectedVariant.priceCents / 100).toFixed(2)
-            }
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="text-2xl font-heading text-text">
+            ${(selectedVariant.priceCents / 100).toFixed(2)}
           </div>
           <button
             onClick={handleAddToCart}
             disabled={!canPurchase}
-            className="rounded-full bg-foreground text-white px-6 py-3 hover:bg-accent transition disabled:opacity-50"
+            className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Add to Cart
+            Add to bag
           </button>
           <button
             onClick={handleBuyNow}
             disabled={!canPurchase}
-            className="rounded-full border px-6 py-3 hover:bg-primary/30 transition disabled:opacity-50"
+            className="rounded-full border border-border/70 px-6 py-3 text-sm font-semibold text-text transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Buy Now
+            Buy now
           </button>
         </div>
 
-        {/* Ingredients, if provided */}
-        {product.ingredients && (
-          <div className="mt-8 text-sm text-gray-600">
-            Ingredients: {product.ingredients}
+        {highlights.length > 0 && (
+          <div className="rounded-2xl border border-border/60 bg-white/70 p-5 text-sm text-muted">
+            <p className="text-xs uppercase tracking-wide text-muted">Why we love it</p>
+            <ul className="mt-3 space-y-2">
+              {highlights.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-accent/60" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {ingredients.length > 0 && (
+          <div className="rounded-2xl border border-border/60 bg-white/70 p-5 text-sm text-muted">
+            <p className="text-xs uppercase tracking-wide text-muted">Ingredients</p>
+            <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {ingredients.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
         )}
 
         {!canPurchase && (
-          <p className="mt-4 text-sm text-red-500">
-            This variant is not available for online purchase yet.
+          <p className="rounded-2xl border border-border/60 bg-highlight/60 px-4 py-3 text-sm text-text">
+            This variant is not available for online purchase yet. Reach out to our concierge team for assistance.
           </p>
         )}
 
-        {/* Reviews section */}
-        <section className="mt-10">
-          <h2 className="font-heading text-2xl mb-4">Customer Reviews</h2>
+        <section>
+          <h2 className="font-heading text-2xl text-text">Customer reviews</h2>
           <ReviewList reviews={reviews} />
         </section>
       </div>
