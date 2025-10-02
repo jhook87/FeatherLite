@@ -5,7 +5,7 @@
 // mapping slugs and SKUs to relative image paths. They return sensible
 // fallbacks if a product or variant does not have a dedicated image.
 
-import manifest from '../../../data/image-manifest.json';
+import manifest from '../../data/image-manifest.json';
 
 /**
  * Return the relative image path for a given product slug. If the slug is
