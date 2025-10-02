@@ -46,6 +46,8 @@ model Product {
   /// `imagePath` will be used and resized by the client.
   thumbnailPath String?
 
+  shopifyProductId String? @unique
+
   @@index([slug])
 }
 
@@ -57,7 +59,7 @@ model Variant {
   sku           String   @unique
   priceCents    Int
   stockQty      Int      @default(0)
-  stripePriceId String?
+  shopifyVariantId String? @unique
   /// Hex value representing this shade; optional until all variants are updated.
   hex           String?
 
@@ -76,22 +78,31 @@ model Image {
 }
 
 model Order {
-  id            String     @id @default(cuid())
-  email         String?
-  currency      String     @default("usd")
-  amountTotal   Int
-  stripeSession String     @unique
-  createdAt     DateTime   @default(now())
-  items         OrderItem[]
+  id               String     @id @default(cuid())
+  shopifyOrderId   String     @unique
+  name             String?
+  email            String?
+  currency         String     @default("USD")
+  subtotalCents    Int
+  totalCents       Int
+  financialStatus  String     @default("pending")
+  fulfillmentStatus String?
+  processedAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  items            OrderItem[]
 }
 
 model OrderItem {
-  id         String  @id @default(cuid())
-  order      Order   @relation(fields: [orderId], references: [id])
-  orderId    String
-  sku        String
-  qty        Int
-  priceCents Int
+  id                String  @id @default(cuid())
+  order             Order   @relation(fields: [orderId], references: [id])
+  orderId           String
+  title             String
+  sku               String?
+  quantity          Int
+  priceCents        Int
+  shopifyLineItemId String? @unique
+  merchandiseId     String?
 }
 
 /// Customer reviews for products. Used on the product detail page to build trust.

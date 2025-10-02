@@ -18,8 +18,10 @@
     "next": "14.2.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "stripe": "^16.6.0",
-    "clsx": "^2.1.1"
+    "clsx": "^2.1.1",
+    "@shopify/admin-api-client": "^1.0.6",
+    "@shopify/shopify-api": "^11.0.1",
+    "shopify-buy": "^2.20.1"
   },
   "devDependencies": {
     "@types/node": "^20.4.2",

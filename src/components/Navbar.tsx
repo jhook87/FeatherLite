@@ -11,7 +11,7 @@ import { useCart } from './CartProvider';
  */
 export default function Navbar() {
   const { items } = useCart();
-  const count = items.reduce((sum, item) => sum + item.qty, 0);
+  const count = items.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <header className="sticky top-0 z-50 backdrop-blur bg-white/70 border-b">
       <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
