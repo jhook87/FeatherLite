@@ -372,26 +372,24 @@ export async function fetchCart(cartId: string): Promise<NormalizedCart | null> 
 
 export async function fetchShopifyProducts() {
   const client = getShopifyAdminClient();
-  const response = await client.get({
-    path: 'products',
-    query: {
+  const response = await client.get('products', {
+    searchParams: {
       limit: 250,
     },
   });
-  const body = response.body as { products?: any[] };
+  const body = (await response.json()) as { products?: any[] };
   return body.products ?? [];
 }
 
 export async function fetchShopifyOrders() {
   const client = getShopifyAdminClient();
-  const response = await client.get({
-    path: 'orders',
-    query: {
+  const response = await client.get('orders', {
+    searchParams: {
       status: 'any',
       limit: 250,
     },
   });
-  const body = response.body as { orders?: any[] };
+  const body = (await response.json()) as { orders?: any[] };
   return body.orders ?? [];
 }
 
