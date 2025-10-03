@@ -6,14 +6,15 @@ import {
   getDummyVariantByShopifyId,
   getDummyVariantCatalog,
 } from '@/lib/dummyContent';
+import { env } from '@/lib/env';
 
 export const shopifyConfig = {
-  storeDomain: process.env.SHOPIFY_STORE_DOMAIN ?? '',
-  storefrontAccessToken: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? '',
-  storefrontApiVersion: process.env.SHOPIFY_STOREFRONT_API_VERSION ?? '2024-04',
-  adminAccessToken: process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ?? '',
-  adminApiVersion: process.env.SHOPIFY_ADMIN_API_VERSION ?? '2024-07',
-  webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET ?? '',
+  storeDomain: env.SHOPIFY_STORE_DOMAIN,
+  storefrontAccessToken: env.SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+  storefrontApiVersion: env.SHOPIFY_STOREFRONT_API_VERSION,
+  adminAccessToken: env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+  adminApiVersion: env.SHOPIFY_ADMIN_API_VERSION,
+  webhookSecret: env.SHOPIFY_WEBHOOK_SECRET,
 };
 
 const storefrontConfigured = Boolean(
