@@ -1,7 +1,8 @@
 // Shop page with search and filter capabilities for Sprint 3
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Filters from '@/components/Filters';
 import ProductCard from '@/components/ProductCard';
 import { getDummyProducts } from '@/lib/dummyContent';
@@ -34,15 +35,28 @@ export default function ShopPage() {
       } as Product;
     });
   }, [fallbackProducts]);
+  const fallbackMap = useMemo(() => {
+    return fallbackEnriched.reduce<Record<string, Product>>((acc, product) => {
+      acc[product.slug] = product;
+      return acc;
+    }, {});
+  }, [fallbackEnriched]);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const resultsHeadingRef = useRef<HTMLDivElement>(null);
+
   const [products, setProducts] = useState<Product[]>(fallbackEnriched);
-  const [filtered, setFiltered] = useState<Product[]>(fallbackEnriched);
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('');
-  const [season, setSeason] = useState('');
-  const [finish, setFinish] = useState('');
-  const [coverage, setCoverage] = useState('');
-  const [concern, setConcern] = useState('');
-  const [sort, setSort] = useState('featured');
+  const [catalog, setCatalog] = useState<Record<string, Product>>(fallbackMap);
+  const [totalAvailable, setTotalAvailable] = useState(fallbackEnriched.length);
+  const [query, setQuery] = useState(() => searchParams.get('query') ?? '');
+  const [category, setCategory] = useState(() => searchParams.get('category')?.toLowerCase() ?? '');
+  const [season, setSeason] = useState(() => searchParams.get('season') ?? '');
+  const [finish, setFinish] = useState(() => searchParams.get('finish')?.toLowerCase() ?? '');
+  const [coverage, setCoverage] = useState(() => searchParams.get('coverage')?.toLowerCase() ?? '');
+  const [concern, setConcern] = useState(() => searchParams.get('concern')?.toLowerCase() ?? '');
+  const [sort, setSort] = useState(() => searchParams.get('sort')?.toLowerCase() ?? 'featured');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -50,37 +64,80 @@ export default function ShopPage() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareMessage, setCompareMessage] = useState<string | null>(null);
 
+  // Keep URL in sync with the chosen filters for sharing and SEO.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    if (category) params.set('category', category);
+    if (season) params.set('season', season);
+    if (finish) params.set('finish', finish);
+    if (coverage) params.set('coverage', coverage);
+    if (concern) params.set('concern', concern);
+    if (sort && sort !== 'featured') params.set('sort', sort);
+    const search = params.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+  }, [query, category, season, finish, coverage, concern, sort, router, pathname]);
+
   // Fetch products on mount
   useEffect(() => {
-    (async () => {
+    const controller = new AbortController();
+
+    async function loadProducts() {
       setLoading(true);
       setError(null);
+      const params = new URLSearchParams();
+      if (query) params.set('query', query);
+      if (category) params.set('category', category);
+      if (season) params.set('season', season);
+      if (finish) params.set('finish', finish);
+      if (coverage) params.set('coverage', coverage);
+      if (concern) params.set('concern', concern);
+      if (sort && sort !== 'featured') params.set('sort', sort);
+
       try {
-        const res = await fetch('/api/products', { cache: 'no-store' });
+        const res = await fetch(`/api/products${params.size ? `?${params.toString()}` : ''}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!res.ok) {
           throw new Error('Unable to load products at this time.');
         }
-        const data = (await res.json()) as Product[];
-        const enriched = data.map((product) => {
-          const attributes = getProductMeta(product.slug);
+        const data = (await res.json()) as { items: Product[]; total: number };
+        const enriched = data.items.map((product) => {
+          const attributes = product.attributes ?? getProductMeta(product.slug);
           return {
             ...product,
             attributes,
-            popularityScore: attributes?.popularityScore ?? 0,
-          };
+            popularityScore: attributes?.popularityScore ?? product.popularityScore ?? 0,
+          } as Product;
         });
         setProducts(enriched);
-        setFiltered(enriched);
+        setTotalAvailable(data.total ?? enriched.length);
+        setCatalog((prev) => {
+          const next = { ...prev };
+          enriched.forEach((product) => {
+            next[product.slug] = product;
+          });
+          return next;
+        });
       } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return;
+        }
         console.warn('Using fallback products for shop grid', err);
         setProducts(fallbackEnriched);
-        setFiltered(fallbackEnriched);
+        setTotalAvailable(fallbackEnriched.length);
+        setCatalog(fallbackMap);
         setError('Showing our studio collection while we connect to Shopify.');
       } finally {
         setLoading(false);
       }
-    })();
-  }, [fallbackEnriched, fallbackProducts]);
+    }
+
+    loadProducts();
+
+    return () => controller.abort();
+  }, [query, category, season, finish, coverage, concern, sort, fallbackEnriched, fallbackMap]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -118,63 +175,11 @@ export default function ShopPage() {
     }
   }, [compareList]);
 
-  const enrichedProducts = useMemo(() => {
-    return products.map((product) => {
-      const attributes = product.attributes ?? getProductMeta(product.slug);
-      return {
-        ...product,
-        attributes,
-        popularityScore: attributes?.popularityScore ?? product.popularityScore ?? 0,
-      };
-    });
-  }, [products]);
-
-  // Filter when query/category/season changes or products change
   useEffect(() => {
-    let list = [...enrichedProducts];
-    if (query) {
-      const q = query.toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    if (!loading && resultsHeadingRef.current) {
+      resultsHeadingRef.current.focus();
     }
-    if (category) {
-      list = list.filter((p) => p.kind.toLowerCase() === category);
-    }
-    if (season) {
-      list = list.filter((p) => p.collection?.season === season);
-    }
-    if (finish) {
-      list = list.filter((p) => p.attributes?.finish === finish);
-    }
-    if (coverage) {
-      list = list.filter((p) => p.attributes?.coverage === coverage);
-    }
-    if (concern) {
-      list = list.filter((p) => p.attributes?.concerns?.includes(concern));
-    }
-
-    const getPrice = (product: Product) => product.variants?.[0]?.priceCents ?? 0;
-    list.sort((a, b) => {
-      if (sort === 'price-asc') {
-        return getPrice(a) - getPrice(b);
-      }
-      if (sort === 'price-desc') {
-        return getPrice(b) - getPrice(a);
-      }
-      if (sort === 'rating') {
-        const aRating = a.averageRating ?? 0;
-        const bRating = b.averageRating ?? 0;
-        return bRating - aRating;
-      }
-      if (sort === 'popularity') {
-        const aScore = (a.popularityScore ?? 0) + (a.reviewCount ?? 0) * 2;
-        const bScore = (b.popularityScore ?? 0) + (b.reviewCount ?? 0) * 2;
-        return bScore - aScore;
-      }
-      return 0;
-    });
-
-    setFiltered(list);
-  }, [query, category, season, finish, coverage, concern, sort, enrichedProducts]);
+  }, [loading, products]);
 
   function toggleWishlist(slug: string) {
     setWishlist((current) =>
@@ -200,11 +205,15 @@ export default function ShopPage() {
     });
   }
 
-  const wishlistProducts = filtered.filter((product) => wishlist.includes(product.slug));
-  const comparisonProducts = enrichedProducts.filter((product) => compareList.includes(product.slug));
+  const wishlistProducts = wishlist
+    .map((slug) => catalog[slug])
+    .filter((product): product is Product => Boolean(product));
+  const comparisonProducts = compareList
+    .map((slug) => catalog[slug])
+    .filter((product): product is Product => Boolean(product));
 
   return (
-    <main className="mx-auto max-w-6xl space-y-10 px-4 pb-16 pt-12">
+    <main className="mx-auto max-w-6xl space-y-10 px-4 pb-16 pt-12" id="main-content" tabIndex={-1}>
       <section className="rounded-[3rem] border border-border/60 bg-white/80 p-10 shadow-lg backdrop-blur">
         <div className="flex flex-col gap-4">
           <p className="text-xs uppercase tracking-wide text-muted">The mineral wardrobe</p>
@@ -233,7 +242,11 @@ export default function ShopPage() {
         onSortChange={setSort}
       />
 
-      {error && <p className="rounded-2xl border border-border/60 bg-highlight/60 px-4 py-3 text-sm text-text">{error}</p>}
+      {error && (
+        <p className="rounded-2xl border border-border/60 bg-highlight/60 px-4 py-3 text-sm text-text" role="alert">
+          {error}
+        </p>
+      )}
       {compareMessage && (
         <p className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm text-accent">{compareMessage}</p>
       )}
@@ -267,7 +280,7 @@ export default function ShopPage() {
       )}
 
       {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3" aria-live="polite">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
@@ -275,18 +288,25 @@ export default function ShopPage() {
             />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-3xl border border-border/60 bg-white/70 p-10 text-center text-sm text-muted">
+      ) : products.length === 0 ? (
+        <div className="rounded-3xl border border-border/60 bg-white/70 p-10 text-center text-sm text-muted" role="status">
           No products match those filters yet. Try clearing a filter or explore our seasonal edits.
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted">
-            <span>{filtered.length} styles</span>
+          <div
+            className="flex flex-col gap-2 text-xs uppercase tracking-wide text-muted sm:flex-row sm:items-center sm:justify-between"
+            ref={resultsHeadingRef}
+            tabIndex={-1}
+            aria-live="polite"
+          >
+            <span>
+              {products.length} styles &middot; {totalAvailable} available
+            </span>
             {query && <span>Searching for “{query}”</span>}
           </div>
           <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-            {filtered.map((p) => (
+            {products.map((p) => (
               <ProductCard
                 key={p.id}
                 product={p}

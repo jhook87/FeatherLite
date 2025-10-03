@@ -37,21 +37,28 @@ export default function Filters({
   onSortChange: Dispatch<SetStateAction<string>>;
 }) {
   return (
-    <div className="mb-8 rounded-3xl border border-border/60 bg-white/70 p-6 shadow-sm backdrop-blur">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <label className="flex-1 text-sm font-medium text-text">
+    <section className="mb-8 rounded-3xl border border-border/60 bg-white/70 p-6 shadow-sm backdrop-blur" aria-label="Product filters">
+      <form
+        className="grid grid-cols-1 gap-4 md:grid-cols-3"
+        role="search"
+        aria-label="Search FeatherLite products"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <label className="flex-1 text-sm font-medium text-text" htmlFor="filters-search">
           <span className="text-xs uppercase tracking-wide text-muted">Search</span>
           <input
-            type="text"
+            id="filters-search"
+            type="search"
             placeholder="Search products"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </label>
-        <label className="text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text" htmlFor="filters-category">
           <span className="text-xs uppercase tracking-wide text-muted">Category</span>
           <select
+            id="filters-category"
             value={category}
             onChange={(e) => onCategoryChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -63,9 +70,10 @@ export default function Filters({
             <option value="set">Sets</option>
           </select>
         </label>
-        <label className="text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text" htmlFor="filters-season">
           <span className="text-xs uppercase tracking-wide text-muted">Season</span>
           <select
+            id="filters-season"
             value={season}
             onChange={(e) => onSeasonChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -78,11 +86,12 @@ export default function Filters({
             <option value="Summer">Summer</option>
           </select>
         </label>
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-        <label className="text-sm font-medium text-text">
+      </form>
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4" role="group" aria-label="Filter by formula attributes">
+        <label className="text-sm font-medium text-text" htmlFor="filters-finish">
           <span className="text-xs uppercase tracking-wide text-muted">Finish</span>
           <select
+            id="filters-finish"
             value={finish}
             onChange={(e) => onFinishChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -95,9 +104,10 @@ export default function Filters({
             <option value="velvet">Velvet</option>
           </select>
         </label>
-        <label className="text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text" htmlFor="filters-coverage">
           <span className="text-xs uppercase tracking-wide text-muted">Coverage</span>
           <select
+            id="filters-coverage"
             value={coverage}
             onChange={(e) => onCoverageChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -109,9 +119,10 @@ export default function Filters({
             <option value="full">Full</option>
           </select>
         </label>
-        <label className="text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text" htmlFor="filters-concern">
           <span className="text-xs uppercase tracking-wide text-muted">Skin concern</span>
           <select
+            id="filters-concern"
             value={concern}
             onChange={(e) => onConcernChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -126,9 +137,10 @@ export default function Filters({
             <option value="creasing">Creasing</option>
           </select>
         </label>
-        <label className="text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text" htmlFor="filters-sort">
           <span className="text-xs uppercase tracking-wide text-muted">Sort by</span>
           <select
+            id="filters-sort"
             value={sort}
             onChange={(e) => onSortChange(e.target.value)}
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -141,6 +153,7 @@ export default function Filters({
           </select>
         </label>
       </div>
-    </div>
+    </section>
   );
 }
+

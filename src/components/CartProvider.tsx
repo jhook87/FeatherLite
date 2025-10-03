@@ -13,6 +13,14 @@ import type { NormalizedCart, NormalizedCartItem } from '@/lib/shopify';
 
 export type CartItem = NormalizedCartItem;
 
+type CartSnapshot = {
+  cartId: string | null;
+  checkoutUrl: string | null;
+  currencyCode: string;
+  subtotalCents: number;
+  items: CartItem[];
+};
+
 type CartCtx = {
   cartId: string | null;
   checkoutUrl: string | null;
@@ -28,15 +36,42 @@ type CartCtx = {
 
 const CartContext = createContext<CartCtx | null>(null);
 
+const CART_STORAGE_KEY = 'featherlite:cart';
+
+function readStoredCart(): CartSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as CartSnapshot) : null;
+  } catch (error) {
+    console.error('Unable to parse stored cart snapshot', error);
+    return null;
+  }
+}
+
+function writeStoredCart(snapshot: CartSnapshot | null) {
+  if (typeof window === 'undefined') return;
+  if (!snapshot || snapshot.items.length === 0) {
+    window.localStorage.removeItem(CART_STORAGE_KEY);
+    window.localStorage.removeItem('shopify-cart-id');
+    return;
+  }
+  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(snapshot));
+  if (snapshot.cartId) {
+    window.localStorage.setItem('shopify-cart-id', snapshot.cartId);
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
+  const [initialSnapshot] = useState<CartSnapshot | null>(() => readStoredCart());
   const [cartId, setCartId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('shopify-cart-id');
+    return initialSnapshot?.cartId ?? window.localStorage.getItem('shopify-cart-id');
   });
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [subtotalCents, setSubtotalCents] = useState(0);
-  const [currencyCode, setCurrencyCode] = useState('USD');
+  const [items, setItems] = useState<CartItem[]>(() => initialSnapshot?.items ?? []);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(() => initialSnapshot?.checkoutUrl ?? null);
+  const [subtotalCents, setSubtotalCents] = useState(() => initialSnapshot?.subtotalCents ?? 0);
+  const [currencyCode, setCurrencyCode] = useState(() => initialSnapshot?.currencyCode ?? 'USD');
 
   const applyCart = useCallback((cart: NormalizedCart | null | undefined) => {
     if (cart && cart.id) {
@@ -45,12 +80,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setCheckoutUrl(cart.checkoutUrl ?? null);
       setSubtotalCents(cart.subtotalCents ?? 0);
       setCurrencyCode(cart.currencyCode ?? 'USD');
+      writeStoredCart({
+        cartId: cart.id,
+        checkoutUrl: cart.checkoutUrl ?? null,
+        currencyCode: cart.currencyCode ?? 'USD',
+        subtotalCents: cart.subtotalCents ?? 0,
+        items: Array.isArray(cart.items) ? cart.items : [],
+      });
     } else {
       setItems([]);
       setCheckoutUrl(null);
       setSubtotalCents(0);
       setCurrencyCode('USD');
       setCartId(null);
+      writeStoredCart({ cartId: null, checkoutUrl: null, currencyCode: 'USD', subtotalCents: 0, items: [] });
     }
   }, []);
 
@@ -81,6 +124,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       applyCart(data.cart);
     } catch (err) {
       console.error('Failed to refresh cart', err);
+      const stored = readStoredCart();
+      if (stored) {
+        setItems(stored.items);
+        setCheckoutUrl(stored.checkoutUrl);
+        setSubtotalCents(stored.subtotalCents);
+        setCurrencyCode(stored.currencyCode);
+        setCartId(stored.cartId);
+      }
     }
   }, [cartId, applyCart]);
 
