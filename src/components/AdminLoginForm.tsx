@@ -23,7 +23,36 @@ export default function AdminLoginForm() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Unable to sign in.');
       }
-      window.location.href = '/admin/reviews';
+      import { useRouter } from 'next/navigation';
+
+export default function AdminLoginForm() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [error, setError] = useState('');
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (status === 'loading') return;
+    setStatus('loading');
+    setError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Unable to sign in.');
+      }
+      router.push('/admin/reviews');
+    } catch (err: any) {
+      setStatus('error');
+      setError(err.message || 'Unable to sign in.');
+    }
+  }
     } catch (err: any) {
       setStatus('error');
       setError(err.message || 'Unable to sign in.');
