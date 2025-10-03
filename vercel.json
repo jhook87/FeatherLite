@@ -8,14 +8,5 @@
   },
   "buildCommand": "npm run prisma:deploy && npm run build",
   "installCommand": "npm install",
-  "build": {
-    "env": {
-      "NEXT_TELEMETRY_DISABLED": "1",
-      "SKIP_ENV_VALIDATION": "false"
-    }
-  },
-  "env": {
-    "NEXT_TELEMETRY_DISABLED": "1"
-  },
-  "outputDirectory": ".next"
+
 }
