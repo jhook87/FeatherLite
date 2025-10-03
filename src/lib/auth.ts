@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { createHmac, timingSafeEqual } from 'crypto';
+import bcrypt from 'bcryptjs';
+import { env } from '@/lib/env';
 
 export const ADMIN_SESSION_COOKIE = 'featherlite.admin';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -11,22 +13,20 @@ type SessionPayload = {
 
 type AdminConfig = {
   email: string;
-  password: string;
+  passwordHash: string;
   secret: string;
 };
 
-function getEnv(name: string, fallback?: string) {
-  if (process.env[name]) {
-    return process.env[name] as string;
-  }
-  return fallback;
-}
-
 export function getAdminConfig(): AdminConfig {
-  const email = getEnv('REVIEW_ADMIN_EMAIL', getEnv('ADMIN_EMAIL', 'admin@featherlite.test'))!;
-  const password = getEnv('REVIEW_ADMIN_PASSWORD', getEnv('ADMIN_PASSWORD', 'featherlite'))!;
-  const secret = getEnv('REVIEW_ADMIN_SECRET', getEnv('NEXTAUTH_SECRET', 'development-secret'))!;
-  return { email, password, secret };
+  const email = env.REVIEW_ADMIN_EMAIL?.trim();
+  const passwordHash = env.REVIEW_ADMIN_PASSWORD_HASH;
+  const secret = env.REVIEW_ADMIN_SECRET;
+
+  if (!email || !passwordHash || !secret) {
+    throw new Error('Administrative credentials are not fully configured.');
+  }
+
+  return { email, passwordHash, secret };
 }
 
 function safeCompare(a: string | undefined | null, b: string | undefined | null) {
@@ -87,12 +87,21 @@ export function isAdminAuthenticated(cookieStore = cookies()) {
 }
 
 export function clearAdminSession(cookieStore = cookies()) {
-  cookieStore.delete(ADMIN_SESSION_COOKIE);
+  const expired = sessionCookieOptions(Date.now() - 60_000);
+  cookieStore.set({ ...expired, value: '' });
 }
 
-export function authenticateCredentials(email: string, password: string) {
-  const { email: adminEmail, password: adminPassword } = getAdminConfig();
-  return safeCompare(adminEmail.toLowerCase(), email.toLowerCase()) && safeCompare(adminPassword, password);
+export async function authenticateCredentials(email: string, password: string) {
+  const { email: adminEmail, passwordHash } = getAdminConfig();
+  if (!safeCompare(adminEmail.toLowerCase(), email.toLowerCase())) {
+    return false;
+  }
+  try {
+    return await bcrypt.compare(password, passwordHash);
+  } catch (error) {
+    console.error('Failed to compare password hash', error);
+    return false;
+  }
 }
 
 export function sessionCookieOptions(expires: number) {
