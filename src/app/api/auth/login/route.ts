@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { authenticateCredentials, setAdminSession } from '@/lib/auth';
 
 const WINDOW_MS = 60 * 1000;
@@ -38,10 +37,39 @@ function isRateLimited(identifier: string) {
   return false;
 }
 
-const payloadSchema = z.object({
-  email: z.string().trim().min(1, 'Email is required').email('Email must be valid'),
-  password: z.string().min(1, 'Password is required'),
-});
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+function parseLoginPayload(raw: unknown): LoginPayload | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const email = 'email' in raw ? (raw.email as unknown) : undefined;
+  const password = 'password' in raw ? (raw.password as unknown) : undefined;
+
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    return null;
+  }
+
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail) {
+    return null;
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(trimmedEmail)) {
+    return null;
+  }
+
+  if (!password) {
+    return null;
+  }
+
+  return { email: trimmedEmail, password };
+}
 
 export async function POST(req: NextRequest) {
   const identifier = getClientIdentifier(req);
@@ -56,12 +84,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const parsed = payloadSchema.safeParse(raw);
-  if (!parsed.success) {
+  const payload = parseLoginPayload(raw);
+  if (!payload) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 400 });
   }
 
-  const { email, password } = parsed.data;
+  const { email, password } = payload;
 
   try {
     const authenticated = await authenticateCredentials(email, password);

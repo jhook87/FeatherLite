@@ -1,6 +1,5 @@
 import { cookies } from 'next/headers';
-import { createHmac, timingSafeEqual } from 'crypto';
-import bcrypt from 'bcryptjs';
+import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import { env } from '@/lib/env';
 
 export const ADMIN_SESSION_COOKIE = 'featherlite.admin';
@@ -91,13 +90,34 @@ export function clearAdminSession(cookieStore = cookies()) {
   cookieStore.set({ ...expired, value: '' });
 }
 
+function verifyPassword(password: string, hash: string) {
+  if (hash.startsWith('sha256:')) {
+    const digest = hash.slice('sha256:'.length);
+    if (!digest) {
+      return false;
+    }
+    const hashed = createHash('sha256').update(password).digest('hex');
+    return safeCompare(hashed, digest);
+  }
+
+  if (hash.startsWith('plain:')) {
+    const expected = hash.slice('plain:'.length);
+    return safeCompare(password, expected);
+  }
+
+  console.error(
+    'Unsupported admin password hash format. Expected a value prefixed with "sha256:" or "plain:".'
+  );
+  return false;
+}
+
 export async function authenticateCredentials(email: string, password: string) {
   const { email: adminEmail, passwordHash } = getAdminConfig();
   if (!safeCompare(adminEmail.toLowerCase(), email.toLowerCase())) {
     return false;
   }
   try {
-    return await bcrypt.compare(password, passwordHash);
+    return verifyPassword(password, passwordHash);
   } catch (error) {
     console.error('Failed to compare password hash', error);
     return false;

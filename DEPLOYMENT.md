@@ -26,7 +26,7 @@ In the Vercel dashboard for your project, add the following variables for the **
 | `SHOPIFY_ADMIN_API_VERSION` | Optional; defaults to `2024-07` if omitted. |
 | `SHOPIFY_WEBHOOK_SECRET` | Webhook signing secret. |
 | `REVIEW_ADMIN_EMAIL` | Email address authorised to moderate reviews. |
-| `REVIEW_ADMIN_PASSWORD_HASH` | Bcrypt hash of the admin password (generate with `npx bcrypt-cli <password>`). |
+| `REVIEW_ADMIN_PASSWORD_HASH` | Admin password encoded as `sha256:<hex>` (use `echo -n "password" | sha256sum`). |
 | `REVIEW_ADMIN_SECRET` | 32+ character secret used to sign admin sessions. |
 
 Set `NEXT_TELEMETRY_DISABLED=1` if you prefer to disable telemetry during builds.

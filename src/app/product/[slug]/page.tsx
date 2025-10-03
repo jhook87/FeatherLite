@@ -18,6 +18,7 @@ interface ProductVariant {
 }
 
 interface Product {
+  id?: string;
   slug: string;
   name: string;
   description?: string | null;

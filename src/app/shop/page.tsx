@@ -1,7 +1,7 @@
 // Shop page with search and filter capabilities for Sprint 3
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Filters from '@/components/Filters';
 import ProductCard from '@/components/ProductCard';
@@ -24,6 +24,29 @@ interface Product {
 }
 
 export default function ShopPage() {
+  return (
+    <Suspense fallback={<ShopPageFallback />}> 
+      <ShopPageContent />
+    </Suspense>
+  );
+}
+
+function ShopPageFallback() {
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-16" aria-busy="true" aria-live="polite">
+      <div className="space-y-6">
+        <div className="h-12 w-2/3 animate-pulse rounded-full bg-primary/40" />
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-80 animate-pulse rounded-3xl bg-primary/30" />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function ShopPageContent() {
   const fallbackProducts = useMemo(() => getDummyProducts() as Product[], []);
   const fallbackEnriched = useMemo(() => {
     return fallbackProducts.map((product) => {

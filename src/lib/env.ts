@@ -6,8 +6,6 @@
  * still providing helpful warnings during local development.
  */
 
-import { z } from 'zod';
-
 const rawEnv = {
   NODE_ENV: process.env.NODE_ENV,
   DATABASE_URL: process.env.DATABASE_URL,
@@ -23,90 +21,132 @@ const rawEnv = {
   REVIEW_ADMIN_SECRET: process.env.REVIEW_ADMIN_SECRET ?? process.env.NEXTAUTH_SECRET,
 };
 
-const envSchema = z
-  .object({
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    DATABASE_URL: z
-      .string()
-      .min(1, 'DATABASE_URL is required')
-      .refine((value) => {
-        if (value.startsWith('file:')) return true;
-        try {
-          // eslint-disable-next-line no-new -- URL constructor validates format
-          new URL(value);
-          return true;
-        } catch (error) {
-          return false;
-        }
-      }, 'DATABASE_URL must be a valid connection string'),
-    SHOPIFY_STORE_DOMAIN: z.string().min(1, 'SHOPIFY_STORE_DOMAIN is required'),
-    SHOPIFY_STOREFRONT_ACCESS_TOKEN: z
-      .string()
-      .min(1, 'SHOPIFY_STOREFRONT_ACCESS_TOKEN is required'),
-    SHOPIFY_STOREFRONT_API_VERSION: z
-      .string()
-      .regex(/^20\d{2}-\d{2}$/u, 'SHOPIFY_STOREFRONT_API_VERSION must follow YYYY-MM format')
-      .default('2024-04'),
-    SHOPIFY_ADMIN_ACCESS_TOKEN: z
-      .string()
-      .min(1, 'SHOPIFY_ADMIN_ACCESS_TOKEN is required'),
-    SHOPIFY_ADMIN_API_VERSION: z
-      .string()
-      .regex(/^20\d{2}-\d{2}$/u, 'SHOPIFY_ADMIN_API_VERSION must follow YYYY-MM format')
-      .default('2024-07'),
-    SHOPIFY_WEBHOOK_SECRET: z.string().min(1, 'SHOPIFY_WEBHOOK_SECRET is required'),
-    REVIEW_ADMIN_EMAIL: z.string().email('REVIEW_ADMIN_EMAIL must be a valid email address'),
-    REVIEW_ADMIN_PASSWORD_HASH: z
-      .string()
-      .regex(
-        /^\$2[aby]\$.{56}$/u,
-        'REVIEW_ADMIN_PASSWORD_HASH must be a bcrypt hash (cost 04-31)'
-      ),
-    REVIEW_ADMIN_SECRET: z
-      .string()
-      .min(32, 'REVIEW_ADMIN_SECRET must be at least 32 characters long'),
-  })
-  .transform((value) => ({
-    ...value,
-    SHOPIFY_STORE_DOMAIN: value.SHOPIFY_STORE_DOMAIN.trim(),
-  }));
+const errors: string[] = [];
 
-type EnvSchema = z.infer<typeof envSchema>;
-
-const shouldSkipValidation = process.env.SKIP_ENV_VALIDATION === 'true';
-const parsedEnv = envSchema.safeParse(rawEnv);
-
-function formatValidationErrors(error: z.ZodError<EnvSchema>): string {
-  return error.errors
-    .map((err) => `${err.path.join('.') || '<root>'}: ${err.message}`)
-    .join('; ');
+function parseNodeEnv(value: string | undefined | null) {
+  if (value === 'development' || value === 'production' || value === 'test') {
+    return value;
+  }
+  return 'development';
 }
 
-if (!parsedEnv.success) {
-  const message = `Invalid environment configuration: ${formatValidationErrors(parsedEnv.error)}`;
-  if (!shouldSkipValidation && rawEnv.NODE_ENV === 'production') {
+function requireString(name: string, value: string | undefined | null) {
+  if (!value) {
+    errors.push(`${name} is required`);
+    return '';
+  }
+  return value;
+}
+
+function requireUrl(name: string, value: string | undefined | null) {
+  const stringValue = requireString(name, value);
+  if (!stringValue) {
+    return '';
+  }
+
+  if (stringValue.startsWith('file:')) {
+    return stringValue;
+  }
+
+  try {
+    // eslint-disable-next-line no-new -- URL constructor validates format
+    new URL(stringValue);
+  } catch (error) {
+    errors.push(`${name} must be a valid connection string`);
+  }
+  return stringValue;
+}
+
+function requireApiVersion(name: string, value: string | undefined | null, fallback: string) {
+  const stringValue = (value && value.trim()) || fallback;
+  if (!/^20\d{2}-\d{2}$/.test(stringValue)) {
+    errors.push(`${name} must follow YYYY-MM format`);
+  }
+  return stringValue;
+}
+
+function requireEmail(name: string, value: string | undefined | null) {
+  const stringValue = requireString(name, value?.trim());
+  if (!stringValue) {
+    return '';
+  }
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(stringValue)) {
+    errors.push(`${name} must be a valid email address`);
+  }
+  return stringValue;
+}
+
+function requirePasswordHash(name: string, value: string | undefined | null) {
+  const stringValue = requireString(name, value?.trim());
+  if (!stringValue) {
+    return '';
+  }
+
+  if (stringValue.startsWith('sha256:')) {
+    const digest = stringValue.slice('sha256:'.length);
+    if (!/^[a-f0-9]{64}$/i.test(digest)) {
+      errors.push(`${name} must contain a hexadecimal SHA-256 digest after "sha256:"`);
+    }
+    return stringValue;
+  }
+
+  if (stringValue.startsWith('plain:')) {
+    if (stringValue.length <= 'plain:'.length) {
+      errors.push(`${name} must include a password after "plain:"`);
+    }
+    return stringValue;
+  }
+
+  errors.push(`${name} must be prefixed with "sha256:" or "plain:"`);
+  return stringValue;
+}
+
+const parsedEnv = {
+  NODE_ENV: parseNodeEnv(rawEnv.NODE_ENV),
+  DATABASE_URL: requireUrl('DATABASE_URL', rawEnv.DATABASE_URL),
+  SHOPIFY_STORE_DOMAIN: requireString('SHOPIFY_STORE_DOMAIN', rawEnv.SHOPIFY_STORE_DOMAIN)?.trim() ?? '',
+  SHOPIFY_STOREFRONT_ACCESS_TOKEN: requireString(
+    'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
+    rawEnv.SHOPIFY_STOREFRONT_ACCESS_TOKEN
+  ),
+  SHOPIFY_STOREFRONT_API_VERSION: requireApiVersion(
+    'SHOPIFY_STOREFRONT_API_VERSION',
+    rawEnv.SHOPIFY_STOREFRONT_API_VERSION,
+    '2024-04'
+  ),
+  SHOPIFY_ADMIN_ACCESS_TOKEN: requireString('SHOPIFY_ADMIN_ACCESS_TOKEN', rawEnv.SHOPIFY_ADMIN_ACCESS_TOKEN),
+  SHOPIFY_ADMIN_API_VERSION: requireApiVersion(
+    'SHOPIFY_ADMIN_API_VERSION',
+    rawEnv.SHOPIFY_ADMIN_API_VERSION,
+    '2024-07'
+  ),
+  SHOPIFY_WEBHOOK_SECRET: requireString('SHOPIFY_WEBHOOK_SECRET', rawEnv.SHOPIFY_WEBHOOK_SECRET),
+  REVIEW_ADMIN_EMAIL: requireEmail('REVIEW_ADMIN_EMAIL', rawEnv.REVIEW_ADMIN_EMAIL),
+  REVIEW_ADMIN_PASSWORD_HASH: requirePasswordHash(
+    'REVIEW_ADMIN_PASSWORD_HASH',
+    rawEnv.REVIEW_ADMIN_PASSWORD_HASH
+  ),
+  REVIEW_ADMIN_SECRET: (() => {
+    const value = requireString('REVIEW_ADMIN_SECRET', rawEnv.REVIEW_ADMIN_SECRET);
+    if (value && value.length < 32) {
+      errors.push('REVIEW_ADMIN_SECRET must be at least 32 characters long');
+    }
+    return value;
+  })(),
+};
+
+const shouldSkipValidation = process.env.SKIP_ENV_VALIDATION === 'true';
+const enforceInProduction = !shouldSkipValidation && parsedEnv.NODE_ENV === 'production' && process.env.VERCEL === '1';
+
+if (errors.length > 0) {
+  const message = `Invalid environment configuration: ${errors.join('; ')}`;
+  if (enforceInProduction) {
     throw new Error(message);
   }
   // eslint-disable-next-line no-console -- surfaced during local development or when validation is skipped
   console.warn(`\u26a0\ufe0f ${message}`);
 }
 
-export const env: EnvSchema = parsedEnv.success
-  ? parsedEnv.data
-  : {
-      NODE_ENV: rawEnv.NODE_ENV === 'development' || rawEnv.NODE_ENV === 'production' || rawEnv.NODE_ENV === 'test' 
-        ? rawEnv.NODE_ENV 
-        : 'development',
-      DATABASE_URL: rawEnv.DATABASE_URL ?? '',
-      SHOPIFY_STORE_DOMAIN: rawEnv.SHOPIFY_STORE_DOMAIN?.trim() ?? '',
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN: rawEnv.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? '',
-      SHOPIFY_STOREFRONT_API_VERSION: rawEnv.SHOPIFY_STOREFRONT_API_VERSION ?? '2024-04',
-      SHOPIFY_ADMIN_ACCESS_TOKEN: rawEnv.SHOPIFY_ADMIN_ACCESS_TOKEN ?? '',
-      SHOPIFY_ADMIN_API_VERSION: rawEnv.SHOPIFY_ADMIN_API_VERSION ?? '2024-07',
-      SHOPIFY_WEBHOOK_SECRET: rawEnv.SHOPIFY_WEBHOOK_SECRET ?? '',
-      REVIEW_ADMIN_EMAIL: rawEnv.REVIEW_ADMIN_EMAIL ?? '',
-      REVIEW_ADMIN_PASSWORD_HASH: rawEnv.REVIEW_ADMIN_PASSWORD_HASH ?? '',
-      REVIEW_ADMIN_SECRET: rawEnv.REVIEW_ADMIN_SECRET ?? '',
-    };
-
+export const env = parsedEnv;
 export type Env = typeof env;
