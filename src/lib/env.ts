@@ -22,6 +22,10 @@ const rawEnv = {
 };
 
 const errors: string[] = [];
+const missingValueHint =
+  process.env.VERCEL === '1'
+    ? 'Set this value in your Vercel Project Settings > Environment Variables.'
+    : 'Add this value to your local .env file.';
 
 function parseNodeEnv(value: string | undefined | null) {
   if (value === 'development' || value === 'production' || value === 'test') {
@@ -32,7 +36,7 @@ function parseNodeEnv(value: string | undefined | null) {
 
 function requireString(name: string, value: string | undefined | null) {
   if (!value) {
-    errors.push(`${name} is required`);
+    errors.push(`${name} is required. ${missingValueHint}`);
     return '';
   }
   return value;
@@ -52,7 +56,9 @@ function requireUrl(name: string, value: string | undefined | null) {
     // eslint-disable-next-line no-new -- URL constructor validates format
     new URL(stringValue);
   } catch (error) {
-    errors.push(`${name} must be a valid connection string`);
+    errors.push(
+      `${name} must be a valid connection string (for example "postgresql://user:password@host:5432/db").`
+    );
   }
   return stringValue;
 }
@@ -86,7 +92,9 @@ function requirePasswordHash(name: string, value: string | undefined | null) {
   if (stringValue.startsWith('sha256:')) {
     const digest = stringValue.slice('sha256:'.length);
     if (!/^[a-f0-9]{64}$/i.test(digest)) {
-      errors.push(`${name} must contain a hexadecimal SHA-256 digest after "sha256:"`);
+      errors.push(
+        `${name} must contain a hexadecimal SHA-256 digest after "sha256:". Generate one with "echo -n 'your-password' | openssl dgst -sha256 -hex".`
+      );
     }
     return stringValue;
   }
@@ -98,7 +106,9 @@ function requirePasswordHash(name: string, value: string | undefined | null) {
     return stringValue;
   }
 
-  errors.push(`${name} must be prefixed with "sha256:" or "plain:"`);
+  errors.push(
+    `${name} must be prefixed with "sha256:" or "plain:". Use "plain:" only for local development and testing.`
+  );
   return stringValue;
 }
 
@@ -137,7 +147,10 @@ const parsedEnv = {
 };
 
 const shouldSkipValidation = process.env.SKIP_ENV_VALIDATION === 'true';
-const enforceInProduction = !shouldSkipValidation && parsedEnv.NODE_ENV === 'production' && process.env.VERCEL === '1';
+const enforceInProduction =
+  !shouldSkipValidation &&
+  (parsedEnv.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') &&
+  process.env.VERCEL === '1';
 
 if (errors.length > 0) {
   const message = `Invalid environment configuration: ${errors.join('; ')}`;

@@ -2,100 +2,126 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const isProductionLike = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+const allowSeeding = process.env.ALLOW_PRISMA_SEED === 'true';
+
 /**
- * Seed script for the FeatherLite Sprint 3 database. This script creates
- * a minimal dataset including a collection, a product with variants that
- * define shade hex values, and a handful of customer reviews. In a
- * production environment you'd replace this with your actual product
- * catalogue and import data from external sources.
+ * Seeds the database with a lightweight demo catalogue that is safe to show to clients.
+ * The script is idempotent, making use of upserts and skipping duplicate review inserts
+ * so that it can be executed multiple times during development without creating duplicates.
  */
 async function main() {
-  // Create or update a collection for year-round products
-  const collection = await prisma.collection.upsert({
-    where: { slug: 'year-round' },
-    update: {},
-    create: {
-      slug: 'year-round',
-      name: 'Year-Round Collection',
-      season: 'Year-Round',
-    },
+  if (isProductionLike && !allowSeeding) {
+    console.warn(
+      'Skipping Prisma seed because the environment appears to be production. Set ALLOW_PRISMA_SEED="true" to override this check.'
+    );
+    return;
+  }
+
+  console.info('🌱 Seeding FeatherLite demo data...');
+
+  await prisma.$transaction(async (tx) => {
+    const collection = await tx.collection.upsert({
+      where: { slug: 'year-round' },
+      update: {
+        name: 'Year-Round Collection',
+        season: 'Year-Round',
+      },
+      create: {
+        slug: 'year-round',
+        name: 'Year-Round Collection',
+        season: 'Year-Round',
+      },
+    });
+
+    const product = await tx.product.upsert({
+      where: { slug: 'featherlite-foundation' },
+      update: {
+        name: 'FeatherLite Mineral Foundation',
+        kind: 'foundation',
+        description:
+          'A breathable mineral foundation created to flex with your skin. Perfect for in-person demos and lightweight enough for everyday use.',
+        ingredients:
+          'Sericite (mica), Kaolin, Magnesium Carbonate, Zinc Stearate, Zinc Oxide, Titanium Dioxide; select shades include ethically sourced micas and iron oxides.',
+        collectionId: collection.id,
+      },
+      create: {
+        slug: 'featherlite-foundation',
+        name: 'FeatherLite Mineral Foundation',
+        kind: 'foundation',
+        description:
+          'A breathable mineral foundation created to flex with your skin. Perfect for in-person demos and lightweight enough for everyday use.',
+        ingredients:
+          'Sericite (mica), Kaolin, Magnesium Carbonate, Zinc Stearate, Zinc Oxide, Titanium Dioxide; select shades include ethically sourced micas and iron oxides.',
+        collectionId: collection.id,
+        variants: {
+          create: [
+            {
+              name: 'Porcelain',
+              sku: 'FL-FOUNDATION-PORCELAIN',
+              priceCents: 2600,
+              stockQty: 40,
+              hex: '#F4E5D5',
+            },
+            {
+              name: 'Sand',
+              sku: 'FL-FOUNDATION-SAND',
+              priceCents: 2600,
+              stockQty: 40,
+              hex: '#E9D1B5',
+            },
+            {
+              name: 'Mocha',
+              sku: 'FL-FOUNDATION-MOCHA',
+              priceCents: 2600,
+              stockQty: 40,
+              hex: '#C89A73',
+            },
+          ],
+        },
+      },
+      include: { variants: true },
+    });
+
+    await tx.variant.deleteMany({
+      where: { productId: product.id, hex: null },
+    });
+
+    await tx.review.createMany({
+      data: [
+        {
+          productId: product.id,
+          name: 'Alice',
+          rating: 5,
+          comment:
+            'The finish is luminous without feeling heavy. Perfect for client demos when we need a reliable base.',
+          status: 'APPROVED',
+        },
+        {
+          productId: product.id,
+          name: 'Bella',
+          rating: 4,
+          comment: 'Glides on smoothly and looks great on camera. The Sand shade is a studio favourite.',
+          status: 'APPROVED',
+        },
+        {
+          productId: product.id,
+          name: 'Chris',
+          rating: 4,
+          comment: 'Love the undertones, but I would like to see a few deeper shades for future campaigns.',
+          status: 'APPROVED',
+        },
+      ],
+      skipDuplicates: true,
+    });
   });
 
-  // Create or update a sample product with three shade variants. Each
-  // variant includes a hex value that will be rendered as a swatch on
-  // the product card and product detail page. Adjust the priceCents
-  // values and shade colours to suit your data.
-  const product = await prisma.product.upsert({
-    where: { slug: 'sample-foundation' },
-    update: {},
-    create: {
-      slug: 'sample-foundation',
-      name: 'Sample Foundation',
-      kind: 'foundation',
-      description: 'A lightweight mineral foundation for everyday wear.',
-      ingredients:
-        'Sericite (mica), Kaolin, Magnesium Carbonate, Zinc Stearate, Zinc Oxide, Titanium Dioxide; some shades: micas & iron oxides',
-      collectionId: collection.id,
-      variants: {
-        create: [
-          {
-            name: 'Porcelain',
-            sku: 'SF-PORCELAIN',
-            priceCents: 2200,
-            stockQty: 50,
-            hex: '#F4E5D5',
-          },
-          {
-            name: 'Sand',
-            sku: 'SF-SAND',
-            priceCents: 2200,
-            stockQty: 50,
-            hex: '#E9D1B5',
-          },
-          {
-            name: 'Mocha',
-            sku: 'SF-MOCHA',
-            priceCents: 2200,
-            stockQty: 50,
-            hex: '#C89A73',
-          },
-        ],
-      },
-    },
-  });
-
-  // Insert a few example reviews for the sample product
-  await prisma.review.createMany({
-    data: [
-      {
-        productId: product.id,
-        name: 'Alice',
-        rating: 5,
-        comment: 'The best foundation I have ever used! It feels weightless and looks so natural.',
-        status: 'APPROVED',
-      },
-      {
-        productId: product.id,
-        name: 'Bella',
-        rating: 4,
-        comment: 'Great coverage and stays on all day. A bit pricey but worth it.',
-        status: 'APPROVED',
-      },
-      {
-        productId: product.id,
-        name: 'Chris',
-        rating: 3,
-        comment: 'Good texture but the shade range could be expanded.',
-        status: 'APPROVED',
-      },
-    ],
-    skipDuplicates: true,
-  });
+  console.info('✅ Demo data seeded successfully.');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error('❌ Prisma seed failed:', error);
     process.exit(1);
   })
   .finally(async () => {
