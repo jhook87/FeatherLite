@@ -5,11 +5,15 @@
   "description": "FeatherLite cosmetics storefront built with Next.js and Prisma",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "prebuild": "prisma generate",
+    "build": "next build",
+    "postbuild": "npm run build:seed",
     "start": "next start",
     "prisma": "prisma",
-    "prisma:deploy": "prisma migrate deploy",
-    "seed": "ts-node prisma/seed.ts",
+    "prisma:deploy": "node ./scripts/prisma-deploy.mjs",
+    "build:seed": "tsc -p prisma/tsconfig.json",
+    "seed": "npx tsx prisma/seed.ts",
+    "seed:prod": "node prisma/dist/seed.js",
     "assets:organize": "node ../scripts/organize-assets.mjs",
     "postinstall": "prisma generate"
   },
@@ -27,11 +31,12 @@
     "@types/node": "^20.4.2",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
+    "@types/shopify-buy": "^2.17.4",
     "autoprefixer": "^10.4.14",
     "prisma": "^5.18.0",
     "tailwindcss": "^3.4.9",
     "typescript": "^5.5.4",
-    "ts-node": "^10.9.1",
-    "postcss": "^8.4.24"
+    "postcss": "^8.4.24",
+    "tsx": "^4.16.5"
   }
 }
