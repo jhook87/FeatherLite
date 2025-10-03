@@ -113,5 +113,15 @@ model Review {
   name      String?
   rating    Int
   comment   String
+  status    ReviewStatus @default(PENDING)
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  moderatedBy String?
+  moderatedAt DateTime?
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

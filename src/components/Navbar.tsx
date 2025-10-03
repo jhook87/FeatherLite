@@ -16,6 +16,7 @@ export default function Navbar() {
     { href: '/shop?season=Year-Round', label: 'Collections' },
     { href: '/#ritual', label: 'Our Ritual' },
     { href: '/#ingredients', label: 'Ingredients' },
+    { href: '/about', label: 'About' },
   ];
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-border/60">

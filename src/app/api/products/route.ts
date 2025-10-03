@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
+import { ReviewStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { getDummyProducts } from '@/lib/dummyContent';
+import { getDummyProducts, getDummyReviews } from '@/lib/dummyContent';
 
 /**
  * API endpoint that returns a list of all live products. Includes each
@@ -16,16 +17,45 @@ import { getDummyProducts } from '@/lib/dummyContent';
  */
 export async function GET() {
   try {
-    const products = await prisma.product.findMany({
-      where: { live: true },
-      include: { variants: true, collection: { select: { season: true } } },
-    });
+    const [products, aggregates] = await Promise.all([
+      prisma.product.findMany({
+        where: { live: true },
+        include: { variants: true, collection: { select: { season: true } } },
+      }),
+      prisma.review.groupBy({
+        by: ['productId'],
+        where: { status: ReviewStatus.APPROVED },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+    ]);
+
     if (products.length > 0) {
-      return NextResponse.json(products);
+      const summary = new Map(
+        aggregates.map((entry) => [entry.productId, { avg: entry._avg.rating ?? 0, count: entry._count.rating }])
+      );
+      return NextResponse.json(
+        products.map((product) => {
+          const stats = summary.get(product.id);
+          return {
+            ...product,
+            averageRating: stats ? Number(stats.avg?.toFixed(2)) : null,
+            reviewCount: stats?.count ?? 0,
+          };
+        })
+      );
     }
   } catch (error) {
     console.warn('Falling back to dummy products because Prisma query failed.', error);
   }
 
-  return NextResponse.json(getDummyProducts());
+  const dummyProducts = getDummyProducts().map((product) => {
+    const reviews = getDummyReviews(product.slug);
+    const reviewCount = reviews.length;
+    const averageRating =
+      reviewCount > 0 ? Number((reviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(2)) : null;
+    return { ...product, averageRating, reviewCount };
+  });
+
+  return NextResponse.json(dummyProducts);
 }
