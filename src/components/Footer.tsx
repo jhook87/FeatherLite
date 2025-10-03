@@ -22,6 +22,7 @@ export default function Footer() {
             <li><a href="/shop" className="transition hover:text-accent">Shop All</a></li>
             <li><a href="/shop?season=Spring" className="transition hover:text-accent">Seasonal Edits</a></li>
             <li><a href="/#ritual" className="transition hover:text-accent">Ritual Guide</a></li>
+            <li><a href="/about" className="transition hover:text-accent">About FeatherLite</a></li>
           </ul>
         </div>
         <div>

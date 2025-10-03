@@ -12,6 +12,14 @@ export default function Filters({
   onCategoryChange,
   season,
   onSeasonChange,
+  finish,
+  onFinishChange,
+  coverage,
+  onCoverageChange,
+  concern,
+  onConcernChange,
+  sort,
+  onSortChange,
 }: {
   query: string;
   onQueryChange: Dispatch<SetStateAction<string>>;
@@ -19,10 +27,18 @@ export default function Filters({
   onCategoryChange: Dispatch<SetStateAction<string>>;
   season: string;
   onSeasonChange: Dispatch<SetStateAction<string>>;
+  finish: string;
+  onFinishChange: Dispatch<SetStateAction<string>>;
+  coverage: string;
+  onCoverageChange: Dispatch<SetStateAction<string>>;
+  concern: string;
+  onConcernChange: Dispatch<SetStateAction<string>>;
+  sort: string;
+  onSortChange: Dispatch<SetStateAction<string>>;
 }) {
   return (
     <div className="mb-8 rounded-3xl border border-border/60 bg-white/70 p-6 shadow-sm backdrop-blur">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <label className="flex-1 text-sm font-medium text-text">
           <span className="text-xs uppercase tracking-wide text-muted">Search</span>
           <input
@@ -33,7 +49,7 @@ export default function Filters({
             className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </label>
-        <label className="md:w-48 text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text">
           <span className="text-xs uppercase tracking-wide text-muted">Category</span>
           <select
             value={category}
@@ -47,7 +63,7 @@ export default function Filters({
             <option value="set">Sets</option>
           </select>
         </label>
-        <label className="md:w-48 text-sm font-medium text-text">
+        <label className="text-sm font-medium text-text">
           <span className="text-xs uppercase tracking-wide text-muted">Season</span>
           <select
             value={season}
@@ -60,6 +76,68 @@ export default function Filters({
             <option value="Winter">Winter</option>
             <option value="Spring">Spring</option>
             <option value="Summer">Summer</option>
+          </select>
+        </label>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <label className="text-sm font-medium text-text">
+          <span className="text-xs uppercase tracking-wide text-muted">Finish</span>
+          <select
+            value={finish}
+            onChange={(e) => onFinishChange(e.target.value)}
+            className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <option value="">All finishes</option>
+            <option value="matte">Matte</option>
+            <option value="satin">Satin</option>
+            <option value="luminous">Luminous</option>
+            <option value="radiant">Radiant</option>
+            <option value="velvet">Velvet</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium text-text">
+          <span className="text-xs uppercase tracking-wide text-muted">Coverage</span>
+          <select
+            value={coverage}
+            onChange={(e) => onCoverageChange(e.target.value)}
+            className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <option value="">All coverage</option>
+            <option value="sheer">Sheer</option>
+            <option value="buildable">Buildable</option>
+            <option value="medium">Medium</option>
+            <option value="full">Full</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium text-text">
+          <span className="text-xs uppercase tracking-wide text-muted">Skin concern</span>
+          <select
+            value={concern}
+            onChange={(e) => onConcernChange(e.target.value)}
+            className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <option value="">All concerns</option>
+            <option value="sensitivity">Sensitivity</option>
+            <option value="oil-control">Oil control</option>
+            <option value="redness">Redness</option>
+            <option value="shine">Shine</option>
+            <option value="texture">Texture</option>
+            <option value="dullness">Dullness</option>
+            <option value="creasing">Creasing</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium text-text">
+          <span className="text-xs uppercase tracking-wide text-muted">Sort by</span>
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="mt-2 w-full rounded-full border border-border/60 bg-white/80 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="rating">Customer Rating</option>
+            <option value="popularity">Most Loved</option>
           </select>
         </label>
       </div>

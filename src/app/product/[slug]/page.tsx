@@ -5,6 +5,7 @@ import { useCart } from '@/components/CartProvider';
 import ShadeSwatches, { Shade } from '@/components/ShadeSwatches';
 import { imageForSlug, variantImageForSku } from '@/lib/paths';
 import ReviewList, { Review } from '@/components/ReviewList';
+import ReviewForm from '@/components/ReviewForm';
 
 interface ProductVariant {
   id: string;
@@ -239,6 +240,7 @@ export default function ProductDetail({ params }: { params: { slug: string } }) 
         <section>
           <h2 className="font-heading text-2xl text-text">Customer reviews</h2>
           <ReviewList reviews={reviews} />
+          <ReviewForm productSlug={slug} />
         </section>
       </div>
     </main>
