@@ -7,7 +7,7 @@
     "dev": "next dev",
     "prebuild": "prisma generate",
     "build": "next build",
-    "postbuild": "prisma generate && npm run build:seed",
+    "postbuild": "npm run build:seed",
     "start": "next start",
     "prisma": "prisma",
     "prisma:deploy": "node ./scripts/prisma-deploy.mjs",
