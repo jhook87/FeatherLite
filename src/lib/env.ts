@@ -94,7 +94,9 @@ if (!parsedEnv.success) {
 export const env: EnvSchema = parsedEnv.success
   ? parsedEnv.data
   : {
-      NODE_ENV: (rawEnv.NODE_ENV as EnvSchema['NODE_ENV']) ?? 'development',
+      NODE_ENV: rawEnv.NODE_ENV === 'development' || rawEnv.NODE_ENV === 'production' || rawEnv.NODE_ENV === 'test' 
+        ? rawEnv.NODE_ENV 
+        : 'development',
       DATABASE_URL: rawEnv.DATABASE_URL ?? '',
       SHOPIFY_STORE_DOMAIN: rawEnv.SHOPIFY_STORE_DOMAIN?.trim() ?? '',
       SHOPIFY_STOREFRONT_ACCESS_TOKEN: rawEnv.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? '',
