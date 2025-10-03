@@ -39,7 +39,11 @@ export default function Footer() {
             Receive product drops, application tips and exclusive invites straight to your inbox.
           </p>
           <form className="flex gap-2">
+            <label htmlFor="footer-email" className="sr-only">
+              Email address
+            </label>
             <input
+              id="footer-email"
               type="email"
               placeholder="you@example.com"
               className="w-full rounded-full border border-border/70 bg-white/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
