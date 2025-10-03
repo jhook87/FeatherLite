@@ -134,8 +134,8 @@ export default function ComparisonDrawer({ open, onClose, products, onRemove, on
                 {products.map((product) => (
                   <td key={`${product.id}-highlights`} className="py-3 pr-4 text-muted">
                     <ul className="space-y-1">
-                      {(product.highlights ?? []).slice(0, 3).map((highlight) => (
-                        <li key={highlight}>• {highlight}</li>
+                      {(product.highlights ?? []).slice(0, 3).map((highlight, index) => (
+                        <li key={index}>• {highlight}</li>
                       ))}
                     </ul>
                   </td>
