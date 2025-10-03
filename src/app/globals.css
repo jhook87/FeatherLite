@@ -20,3 +20,23 @@ body {
     radial-gradient(circle at 20% 20%, rgba(246, 236, 239, 0.7), transparent 55%),
     radial-gradient(circle at 80% 0%, rgba(124, 92, 252, 0.12), transparent 60%);
 }
+
+.skip-link {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -200%;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  background-color: rgba(16, 24, 32, 0.85);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  z-index: 1000;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: 2px solid rgba(124, 92, 252, 0.6);
+}

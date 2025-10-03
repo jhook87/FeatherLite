@@ -20,7 +20,7 @@ export default function Navbar() {
   ];
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-border/60">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4" aria-label="Primary navigation">
         <div className="flex items-center gap-10">
           <Link href="/" className="font-heading text-xl tracking-tight text-text">
             FeatherLite

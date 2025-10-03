@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ProductAttributes } from '@/data/productMeta';
 
@@ -28,14 +29,66 @@ function formatPrice(product: ComparableProduct) {
 }
 
 export default function ComparisonDrawer({ open, onClose, products, onRemove, onClear }: ComparisonDrawerProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const drawerEl = dialogRef.current;
+    const focusable = drawerEl
+      ? (drawerEl.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        ) ?? [])
+      : [];
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key === 'Tab' && focusable.length > 0) {
+        if (event.shiftKey) {
+          if (document.activeElement === first) {
+            event.preventDefault();
+            (last || first)?.focus();
+          }
+        } else if (document.activeElement === last) {
+          event.preventDefault();
+          (first || last)?.focus();
+        }
+      }
+    };
+
+    const focusTarget = closeButtonRef.current ?? first;
+    focusTarget?.focus();
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 px-4 py-6 md:items-center">
-      <div className="w-full max-w-5xl rounded-t-3xl border border-border/60 bg-white/95 p-6 shadow-2xl backdrop-blur md:rounded-3xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 px-4 py-6 md:items-center" role="presentation">
+      <div
+        ref={dialogRef}
+        className="w-full max-w-5xl rounded-t-3xl border border-border/60 bg-white/95 p-6 shadow-2xl backdrop-blur md:rounded-3xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="comparison-drawer-heading"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">FeatherLite comparison</p>
-            <h2 className="font-heading text-2xl text-text">Side-by-side look</h2>
+            <h2 id="comparison-drawer-heading" className="font-heading text-2xl text-text">
+              Side-by-side look
+            </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -48,6 +101,7 @@ export default function ComparisonDrawer({ open, onClose, products, onRemove, on
             <button
               type="button"
               onClick={onClose}
+              ref={closeButtonRef}
               className="rounded-full bg-text px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm"
             >
               Close
