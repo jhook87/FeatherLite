@@ -126,6 +126,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       console.error('Failed to refresh cart', err);
       const stored = readStoredCart();
       if (stored) {
+        applyCart({
+          id: stored.cartId || '',
+          items: stored.items,
+          checkoutUrl: stored.checkoutUrl,
+          subtotalCents: stored.subtotalCents,
+          currencyCode: stored.currencyCode
+        });
         setItems(stored.items);
         setCheckoutUrl(stored.checkoutUrl);
         setSubtotalCents(stored.subtotalCents);
