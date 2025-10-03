@@ -157,7 +157,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         items: filtered,
-        total: filtered.length,
+        total: mapped.length,
       });
     }
   } catch (error) {
@@ -176,6 +176,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     items: filtered,
-    total: filtered.length,
+    total: dummyProducts.length,
   });
 }

@@ -133,6 +133,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
           subtotalCents: stored.subtotalCents,
           currencyCode: stored.currencyCode
         });
+        setItems(stored.items);
+        setCheckoutUrl(stored.checkoutUrl);
+        setSubtotalCents(stored.subtotalCents);
+        setCurrencyCode(stored.currencyCode);
       }
     }
   }, [cartId, applyCart]);
