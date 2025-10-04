@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import SystemStatusBanner from './SystemStatusBanner';
 
 type ModerationReview = {
   id: string;
@@ -84,6 +85,7 @@ export default function AdminReviewDashboard() {
 
   return (
     <div className="space-y-8">
+      <SystemStatusBanner />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-3xl text-text">Review moderation</h1>
