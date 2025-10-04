@@ -1,10 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "functions": {
-    "app/**/route": { "runtime": "nodejs20.x" },
-    "api/**":       { "runtime": "nodejs20.x" }
-  },
+  "installCommand": "npm ci",
   "buildCommand": "npm run prisma:deploy && npm run build",
-  "installCommand": "npm install"
+  "functions": {
+    "app/**/route.{js,ts}": { "runtime": "nodejs20.x" },
+    "api/**/*.{js,ts}":     { "runtime": "nodejs20.x" }
+  }
 }
